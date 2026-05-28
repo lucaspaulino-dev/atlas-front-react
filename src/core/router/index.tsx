@@ -8,8 +8,6 @@ import CompaniesPage from '@/modules/companies/CompaniesPage'
 import SegmentationPage from '@/modules/segmentation/SegmentationPage'
 import TourismPage from '@/modules/tourism/TourismPage'
 import IndicationDetailPage from '@/modules/indication/IndicationDetailPage'
-import OrganizationListingPage from '@/modules/organization/OrganizationListingPage'
-import OrganizationDetailPage from '@/modules/organization/OrganizationDetailPage'
 
 export const router = createBrowserRouter([
   {
@@ -43,18 +41,6 @@ export const router = createBrowserRouter([
             element: <SegmentationPage />,
           },
           { path: 'turismo', handle: { breadcrumb: 'menu.tourism' }, element: <TourismPage /> },
-          {
-            path: 'organization',
-            handle: { breadcrumb: 'menu.organization' },
-            children: [
-              { index: true, element: <OrganizationListingPage /> },
-              {
-                path: ':id',
-                handle: { dynamicBreadcrumb: true },
-                element: <OrganizationDetailPage />,
-              },
-            ],
-          },
         ],
       },
     ],

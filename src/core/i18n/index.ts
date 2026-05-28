@@ -4,16 +4,12 @@ import { initReactI18next } from 'react-i18next'
 import common from '@/mock/languages/common.json'
 import indicationDetail from '@/mock/languages/indication/indication-detail.json'
 import indicationListing from '@/mock/languages/indication/indication-listing.json'
-import organizationDetail from '@/mock/languages/organization/organization-detail.json'
-import organizationListing from '@/mock/languages/organization/organization-listing.json'
 import menu from '@/mock/languages/menu/menu.json'
 
 const mergeTranslations = (lang: string) => ({
   ...common[lang as keyof typeof common],
   ...indicationDetail[lang as keyof typeof indicationDetail],
   ...indicationListing[lang as keyof typeof indicationListing],
-  ...organizationDetail[lang as keyof typeof organizationDetail],
-  ...organizationListing[lang as keyof typeof organizationListing],
   ...menu[lang as keyof typeof menu],
 })
 
