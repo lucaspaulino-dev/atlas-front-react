@@ -1,5 +1,33 @@
 # Governança de Código — atlas-front-react
 
+## Quick Start (Leia Primeiro)
+
+Se você acabou de clonar o repositório, siga estes passos antes de ler qualquer outra coisa:
+
+```bash
+npm install
+cp .env.example .env   # edite VITE_API_URL se necessário
+npm run dev            # http://localhost:5173
+```
+
+Para criar um novo módulo CRUD:
+
+```bash
+npm run atlas -- create module <nome>
+```
+
+**3 regras que nunca podem ser quebradas:**
+
+1. **Sem imports cross-module** — `src/modules/X` nunca importa de `src/modules/Y`. Serviços compartilhados vão para `shared/` ou `core/`.
+2. **Sempre use `httpRequest`** — nunca chame `axios` diretamente. Use `httpRequest<T>` de `@/core/http/request.helper`.
+3. **Sempre use `useListing`** — para qualquer listagem paginada com busca, use o hook `useListing` de `@/shared/hooks/useListing`.
+
+**Módulo de referência:** `src/modules/indication/` é a implementação canônica. Quando tiver dúvida sobre estrutura, copie dali.
+
+O restante deste documento é referência — leia conforme precisar.
+
+---
+
 ## 0. Setup & Desenvolvimento
 
 ### Pré-requisitos
@@ -15,7 +43,11 @@ npm install
 
 ### Variáveis de ambiente
 
-Crie o arquivo `.env` na raiz do projeto `atlas-front-react/`:
+Copie `.env.example` para `.env` na raiz do projeto e ajuste conforme necessário:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 VITE_API_URL=http://localhost:8000/api
@@ -34,7 +66,7 @@ VITE_API_URL=http://localhost:8000/api
 
 ### Atlas CLI — gerador de módulos
 
-O projeto inclui um scaffolder de linha de comando que gera todos os 13 arquivos de boilerplate de um módulo CRUD, cria os arquivos i18n correspondentes, e registra a rota automaticamente.
+O projeto inclui um scaffolder de linha de comando que gera todos os 14 arquivos de boilerplate de um módulo CRUD (incluindo `.context.md`), cria os arquivos i18n correspondentes, e registra a rota automaticamente.
 
 ```bash
 npm run atlas -- create module <nome>
@@ -50,7 +82,7 @@ npm run atlas -- create module product-category
 
 **O que é gerado:**
 
-- `src/modules/<kebab>/` — árvore completa do módulo (13 arquivos)
+- `src/modules/<kebab>/` — árvore completa do módulo (14 arquivos, incluindo `.context.md`)
 - `src/mock/languages/<kebab>/<kebab>-listing.json` — chaves i18n de listagem (pt-BR, en-US, es-ES)
 - `src/mock/languages/<kebab>/<kebab>-detail.json` — chaves i18n de detalhe (pt-BR, en-US, es-ES)
 - Patch em `src/core/i18n/index.ts` — imports e spreads de listing + detail
@@ -73,6 +105,8 @@ localStorage.setItem('atlas-token', 'dev-token')
 ```
 
 Navegue para `http://localhost:5173` após executar o comando. O `ProtectedRoute` lê esse valor e libera o acesso. Remova a chave para testar o fluxo de redirecionamento ao login.
+
+> **Atenção — dívida de segurança:** o token está armazenado em `localStorage`, que é legível por scripts XSS. Este padrão **não deve ser replicado** em novos módulos. Quando o backend de autenticação for implementado, os tokens devem ser armazenados em cookies `httpOnly`.
 
 ### Alias de paths
 
@@ -2103,6 +2137,21 @@ export default function <Feature>ListingPage() {
 
 ---
 
+### DetailPage vs. DetailSheet — guia de decisão
+
+Ao criar um novo módulo, você tem duas opções para o fluxo de detalhe:
+
+| Padrão                                     | Quando usar                                                                              | Como implementar                                                                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **DetailPage** (rota `/:id`)               | O detalhe precisa de URL própria — compartilhável, acessível por link direto, indexável. | Use o boilerplate do Arquivo 13. O scaffolder gera este padrão por padrão.                                                                       |
+| **DetailSheet** (painel lateral, sem rota) | O detalhe é contextual — o usuário abre e fecha sem sair da listagem.                    | Delete `<Feature>DetailPage.tsx` e a rota `/:id` gerada pelo scaffolder. Use `src/modules/indication/IndicationDetailSheet.tsx` como referência. |
+
+**Regra prática:** se o usuário precisar compartilhar um link para o detalhe, use DetailPage. Se não, use DetailSheet.
+
+O scaffolder gera DetailPage por padrão. Se você escolher DetailSheet, delete o arquivo `<Feature>DetailPage.tsx` e remova a rota `{ path: ':id', ... }` do router.
+
+---
+
 ### Arquivo 13 — `<Feature>DetailPage.tsx`
 
 ```tsx
@@ -2213,3 +2262,81 @@ Antes de abrir PR, confirme:
 - [ ] `src/mock/languages/<kebab>/<kebab>-detail.json` — chaves de detalhe criadas
 - [ ] Ambos importados e spreados em `src/core/i18n/index.ts`
 - [ ] Chave `menu.<feature>` adicionada em `src/mock/languages/menu/menu.json` (pt-BR, en-US, es-ES)
+
+---
+
+## 6. Convenções Adicionais
+
+### Imports — proibição de barrel files
+
+Não crie arquivos `index.ts` barrel. Todos os imports devem usar o caminho completo do arquivo.
+
+```ts
+// correto
+import { useListing } from '@/shared/hooks/useListing'
+import { Button } from '@/shared/components/ui/button'
+
+// errado — não crie index.ts que reexporta
+import { useListing, Button } from '@/shared'
+```
+
+### Loading state
+
+Use `<Spinner />` para loading de página inteira e para operações assíncronas (ex: submit de formulário). Skeleton screens não estão implementados — se adicionar skeletons no futuro, documente aqui.
+
+```tsx
+// loading de página
+<div className="flex items-center justify-center py-24">
+  <Spinner size="lg" />
+</div>
+
+// loading inline (ex: botão de submit)
+<Spinner size="sm" />
+```
+
+### `toolbarActions` vs. botão no header da página
+
+`ListingTable` aceita uma prop `toolbarActions` que renderiza no lado direito da toolbar da tabela. O boilerplate do Arquivo 12 usa um botão no `<header>` da página (fora da tabela) — ambas as abordagens são aceitas:
+
+- Use **`toolbarActions`** quando a ação está diretamente vinculada à tabela (ex: "Novo Registro" que abre o `FormDialog` da listagem).
+- Use o **header da página** quando a ação é independente da tabela (ex: botão de exportar relatório).
+
+Mantenha consistência dentro do módulo: escolha uma abordagem e use-a em todos os dialogs/actions do mesmo módulo.
+
+### Code Style
+
+ESLint e Prettier estão configurados no projeto.
+
+```bash
+npm run lint     # verifica problemas de linting
+npm run format   # formata o código com Prettier
+```
+
+Execute `npm run lint` antes de abrir um PR. O CI poderá rejeitar PRs com erros de lint.
+
+### Testing
+
+Nenhum runner de testes (Jest/Vitest) está configurado atualmente. O diretório `__mocks__` em `src/modules/indication/hooks/__mocks__/` está reservado para uso futuro.
+
+**Não adicione diretórios `__mocks__` a novos módulos** até que uma estratégia de testes seja definida para o projeto.
+
+### Dívida técnica rastreada
+
+#### Cross-module import em `useDashboardStats`
+
+O hook `src/modules/dashboard/hooks/useDashboardStats.ts` importa de `@/modules/indication/services/indication.service`. Esta é uma violação da regra de isolamento de módulos — rastreada e **não replicável**.
+
+A resolução futura consiste em expor um endpoint `/dashboard/stats` na API e remover a dependência cruzada.
+
+### `ErrorBoundary` — captura de erros de renderização
+
+O componente `ErrorBoundary` em `src/shared/components/base/ErrorBoundary.tsx` envolve o `<Outlet />` no `MainLayout`. Ele evita que um erro de renderização em qualquer módulo derrube toda a aplicação.
+
+```tsx
+import { ErrorBoundary } from '@/shared/components/base/ErrorBoundary'
+
+// uso como wrapper
+;<ErrorBoundary>{children}</ErrorBoundary>
+```
+
+O fallback padrão exibe uma mensagem amigável em português e um botão de recarga. Em ambiente de desenvolvimento (`import.meta.env.DEV`), a mensagem de erro técnica também é exibida abaixo do fallback.

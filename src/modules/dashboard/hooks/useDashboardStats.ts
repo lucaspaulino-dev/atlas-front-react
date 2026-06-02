@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+// TODO: ARCHITECTURE VIOLATION — cross-module import, tracked.
+// See docs/GOVERNANCE.md § "Dívida técnica rastreada".
+// Do not replicate. Resolve by exposing a /dashboard/stats API endpoint.
 import { fetchIndications } from '@/modules/indication/services/indication.service'
 
 export interface DashboardStats {

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
-import { useDashboardStats } from './useDashboardStats'
+import { useDashboardStats } from './hooks/useDashboardStats'
 
 interface StatCardProps {
   label: string
