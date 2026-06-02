@@ -149,12 +149,12 @@ function formatDate(isoString: string): string {
 }
 
 export async function fetch{{FeaturePlural}}(filter: ListingFilter): Promise<FetchResponse<{{Feature}}Row>> {
-  const { search, page, limit, signal } = filter
+  const { search, page, limit, signal, extraParams } = filter
   const response = await httpRequest<Api{{Feature}}ListResponse>(
     'GET',
     '/{{apiSlug}}',
     undefined,
-    { params: { page, per_page: limit, search }, signal }
+    { params: { page, per_page: limit, search, ...extraParams }, signal }
   )
   const rows: {{Feature}}Row[] = response.data.map((item) => ({
     id: item.id,
@@ -218,7 +218,7 @@ export function use{{FeaturePlural}}() {
     { id: 'actions', header: t('{{feature}}Listing.table.columns.actions') },
   ]
 
-  const { data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload } =
+  const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setExtraParams, setPage, reload } =
     useListing<{{Feature}}Row>({ fetcher: fetch{{FeaturePlural}}, enablePagination: true })
 
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
@@ -251,8 +251,10 @@ export function use{{FeaturePlural}}() {
     data,
     isLoading,
     pagination,
-    searchQuery,
-    setSearchQuery,
+    searchInput,
+    setSearchInput,
+    submitSearch,
+    setExtraParams,
     setPage,
     reload,
     isConfirmDialogOpen,
@@ -586,30 +588,35 @@ export function {{Feature}}MainContainer({ data, onEdit }: Props) {
 function tplListingPage({ Feature, feature, kebab, featurePlural, FeaturePlural }) {
   return sub(
     `// src/modules/{{kebab}}/{{Feature}}ListingPage.tsx
-import { useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
-import { Trash2, FileSearch, PlusCircle } from 'lucide-react'
+import { Trash2, FileSearch, PlusCircle, Filter } from 'lucide-react'
 import { use{{FeaturePlural}} } from './hooks/use{{FeaturePlural}}'
 import { use{{Feature}}Create } from './hooks/use{{Feature}}Create'
 import { ListingTable } from '@/shared/components/base/ListingTable'
+import { FilterSheet, type FilterGroup } from '@/shared/components/base/FilterSheet'
+import { ActiveFilters } from '@/shared/components/base/ActiveFilters'
 import { ConfirmDialog } from '@/shared/components/base/ConfirmDialog'
 import { FormDialog } from '@/shared/components/base/FormDialog'
 import { {{Feature}}CreateForm } from './components/{{Feature}}CreateForm'
+import { {{Feature}}DetailSheet } from './{{Feature}}DetailSheet'
 import { Button } from '@/shared/components/ui/button'
 import type { {{Feature}}Row } from './types/{{kebab}}.type'
 
 export default function {{Feature}}ListingPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const {
     columns,
     data,
     isLoading,
     pagination,
-    searchQuery,
-    setSearchQuery,
+    searchInput,
+    setSearchInput,
+    submitSearch,
+    setExtraParams,
     setPage,
     reload,
     isConfirmDialogOpen,
@@ -621,6 +628,35 @@ export default function {{Feature}}ListingPage() {
 
   const { isFormOpened, isSubmitting, openForm, closeForm, handleSubmit } =
     use{{Feature}}Create(reload)
+
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({})
+
+  const filterGroups: FilterGroup[] = useMemo(() => [], [])
+
+  const activeFilterCount = Object.values(appliedFilters).flat().length
+
+  function handleApplyFilters(draft: Record<string, string[]>) {
+    setAppliedFilters(draft)
+    setFilterSheetOpen(false)
+    const extra: Record<string, string[]> = {}
+    for (const [key, vals] of Object.entries(draft)) {
+      if (vals.length > 0) extra[key] = vals
+    }
+    setExtraParams(Object.keys(extra).length > 0 ? extra : undefined)
+  }
+
+  function handleRemoveFilter(groupKey: string, value: string) {
+    const updated = {
+      ...appliedFilters,
+      [groupKey]: (appliedFilters[groupKey] ?? []).filter((v) => v !== value),
+    }
+    handleApplyFilters(updated)
+  }
+
+  function handleClearAllFilters() {
+    handleApplyFilters({})
+  }
 
   const renderCell = useCallback(
     (columnId: string, row: {{Feature}}Row) => {
@@ -640,7 +676,7 @@ export default function {{Feature}}ListingPage() {
               variant="ghost"
               size="icon"
               className="text-muted-foreground hover:text-primary"
-              onClick={() => navigate(\`/{{kebab}}/\${row.id}\`)}
+              onClick={() => setSelectedId(row.id)}
             >
               <FileSearch className="w-4 h-4" />
             </Button>
@@ -649,11 +685,21 @@ export default function {{Feature}}ListingPage() {
       }
       return null
     },
-    [isLoading, navigate, promptDelete]
+    [isLoading, promptDelete]
   )
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between pb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">{t('{{feature}}Listing.page.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('{{feature}}Listing.page.description')}</p>
+        </div>
+        <Button disabled={isLoading} onClick={openForm}>
+          <PlusCircle className="w-4 h-4 mr-2" />
+          {t('common.newRegister')}
+        </Button>
+      </div>
       <ListingTable
         columns={columns}
         data={data}
@@ -661,15 +707,29 @@ export default function {{Feature}}ListingPage() {
         enableSearch
         enablePagination
         pagination={pagination}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearchSubmit={submitSearch}
         onPageChange={setPage}
         renderCell={renderCell}
-        toolbarActions={
-          <Button disabled={isLoading} onClick={openForm}>
-            <PlusCircle className="w-4 h-4 mr-2" />
-            {t('common.newRegister')}
+        filters={
+          <Button variant="outline" disabled={isLoading} onClick={() => setFilterSheetOpen(true)}>
+            <Filter className="w-4 h-4 mr-2" />
+            {t('common.filters')}
+            {activeFilterCount > 0 && (
+              <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
           </Button>
+        }
+        activeFilters={
+          <ActiveFilters
+            groups={filterGroups}
+            values={appliedFilters}
+            onRemove={handleRemoveFilter}
+            onClearAll={handleClearAllFilters}
+          />
         }
       />
 
@@ -699,6 +759,21 @@ export default function {{Feature}}ListingPage() {
           onSubmit={handleSubmit}
         />
       </FormDialog>
+
+      <{{Feature}}DetailSheet
+        id={selectedId}
+        open={selectedId !== null}
+        onClose={() => setSelectedId(null)}
+      />
+
+      <FilterSheet
+        open={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        groups={filterGroups}
+        values={appliedFilters}
+        onApply={handleApplyFilters}
+        disabled={isLoading}
+      />
     </div>
   )
 }
@@ -707,67 +782,79 @@ export default function {{Feature}}ListingPage() {
   )
 }
 
-function tplDetailPage({ Feature, feature, kebab }) {
+function tplDetailSheet({ Feature, feature, kebab }) {
   return sub(
-    `// src/modules/{{kebab}}/{{Feature}}DetailPage.tsx
-import { useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+    `// src/modules/{{kebab}}/{{Feature}}DetailSheet.tsx
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/shared/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/shared/components/ui/sheet'
 import { Spinner } from '@/shared/components/ui/spinner'
-import { useBreadcrumbStore } from '@/core/store/breadcrumb.store'
 import { FormDialog } from '@/shared/components/base/FormDialog'
 import { {{Feature}}MainContainer } from './containers/{{Feature}}MainContainer'
 import { {{Feature}}EditForm } from './components/{{Feature}}EditForm'
 import { use{{Feature}}Detail } from './hooks/use{{Feature}}Detail'
 import { use{{Feature}}Edit } from './hooks/use{{Feature}}Edit'
 
-export default function {{Feature}}DetailPage() {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const { id } = useParams<{ id: string }>()
+interface Props {
+  id: number | null
+  open: boolean
+  onClose: () => void
+}
 
-  const { data, isLoading, error, reload } = use{{Feature}}Detail(Number(id))
+export function {{Feature}}DetailSheet({ id, open, onClose }: Props) {
+  const { t } = useTranslation()
+
+  const { data, isLoading, error, reload } = use{{Feature}}Detail(id ?? 0)
   const { isFormOpened, isSubmitting, editTarget, openForm, closeForm, handleSubmit } =
     use{{Feature}}Edit(reload)
 
-  const setTitle = useBreadcrumbStore((s) => s.setTitle)
-  const clearTitle = useBreadcrumbStore((s) => s.clearTitle)
+  function renderBody() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center flex-1 py-24">
+          <Spinner size="lg" />
+        </div>
+      )
+    }
 
-  useEffect(() => {
-    // Identifique o campo primário não-nulo do recurso e use-o como breadcrumb.
-    // - Se "name" nunca é null: setTitle(data.name)
-    // - Se "name" é string | null e existe campo alternativo (ex: acronym, code, ip):
-    //   setTitle(data.acronym)
-    // - Se não há alternativa: setTitle(data.name ?? String(data.id))
-    if (data) setTitle(data.name)
-    return () => clearTitle()
-  }, [data, setTitle, clearTitle])
+    if (error || !data) {
+      return (
+        <div className="flex items-center justify-center flex-1 py-24">
+          <span className="text-sm text-destructive">{t('common.errorMessage')}</span>
+        </div>
+      )
+    }
 
-  if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner size="lg" />
-      </div>
-    )
-  }
-
-  if (error || !data) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-16">
-        {/* Nunca renderize \`error\` diretamente — o valor é um sentinel interno do hook,
-            não uma mensagem para o usuário. Use sempre a chave i18n. */}
-        <span className="text-sm text-destructive">{t('common.errorMessage')}</span>
-        <Button variant="ghost" size="sm" onClick={() => navigate('/{{kebab}}')}>
-          {t('{{feature}}Detail.backToList')}
-        </Button>
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <{{Feature}}MainContainer data={data} onEdit={() => openForm(data)} />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <{{Feature}}MainContainer data={data} onEdit={() => openForm(data)} />
+    <>
+      <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+        <SheetContent>
+          <SheetHeader className="pr-10">
+            <SheetTitle className="truncate">
+              {isLoading ? t('common.loading') : (data?.name ?? '—')}
+            </SheetTitle>
+            {data && (
+              <SheetDescription>
+                {t('{{feature}}Detail.fields.id')}: {data.id}
+              </SheetDescription>
+            )}
+          </SheetHeader>
+
+          {renderBody()}
+        </SheetContent>
+      </Sheet>
 
       <FormDialog
         open={isFormOpened}
@@ -786,7 +873,7 @@ export default function {{Feature}}DetailPage() {
           />
         )}
       </FormDialog>
-    </div>
+    </>
   )
 }
 `,
@@ -799,6 +886,10 @@ function tplI18nListing({ Feature, feature, kebab }) {
     {
       'pt-BR': {
         [`${feature}Listing`]: {
+          page: {
+            title: `${Feature}`,
+            description: `Gerencie os registros de ${Feature}`,
+          },
           table: {
             columns: {
               name: 'Nome',
@@ -827,6 +918,10 @@ function tplI18nListing({ Feature, feature, kebab }) {
       },
       'en-US': {
         [`${feature}Listing`]: {
+          page: {
+            title: `${Feature}`,
+            description: `Manage the ${Feature} records`,
+          },
           table: {
             columns: {
               name: 'Name',
@@ -855,6 +950,10 @@ function tplI18nListing({ Feature, feature, kebab }) {
       },
       'es-ES': {
         [`${feature}Listing`]: {
+          page: {
+            title: `${Feature}`,
+            description: `Gestione los registros de ${Feature}`,
+          },
           table: {
             columns: {
               name: 'Nombre',
@@ -925,6 +1024,44 @@ function tplI18nDetail({ Feature, feature }) {
   )
 }
 
+function tplContextMd({ Feature, kebab, camel, plural, apiSlug, date }) {
+  return sub(
+    `<context path="src/modules/{{kebab}}" updated="{{date}}">
+
+{{Feature}} module — generated by Atlas CLI on {{date}}.
+
+## Summary
+
+- {{Feature}}ListingPage.tsx — listing page with search, filters, and pagination
+- {{Feature}}DetailSheet.tsx — slide-over detail panel (opens from the listing, no /:id route)
+- types/{{kebab}}.type.ts — API and domain type interfaces
+- schemas/{{kebab}}.schema.ts — Zod validation schemas with i18n error messages
+- services/{{kebab}}.service.ts — pure async functions via httpRequest
+- hooks/use{{plural}}.ts — listing state via useListing (search, pagination, delete)
+- hooks/use{{Feature}}Create.ts — create form open/close/submit state
+- hooks/use{{Feature}}Edit.ts — edit form open/close/submit state with editTarget
+- hooks/use{{Feature}}Detail.ts — detail fetch with AbortController
+- hooks/use{{Feature}}FormOptions.ts — select options fetch with AbortController
+- components/{{Feature}}CreateForm.tsx — RHF + Zod create form
+- components/{{Feature}}EditForm.tsx — RHF + Zod edit form with initialData
+- containers/{{Feature}}MainContainer.tsx — stateless detail card (no data fetching)
+
+## Notes
+
+- DetailSheet is generated by default (no /:id route). If you need a routed detail
+  page instead, delete {{Feature}}DetailSheet.tsx, add a {{Feature}}DetailPage.tsx
+  following GOVERNANCE.md Arquivo 13, and add the /:id route to the router.
+- API endpoint: update the endpoint slug in services/{{kebab}}.service.ts
+  (generated as /{{apiSlug}}).
+- i18n: fill in the keys generated in src/mock/languages/{{kebab}}/.
+- Reference module: src/modules/indication/ is the canonical reference implementation.
+
+</context>
+`,
+    { Feature, kebab, camel, plural, apiSlug, date }
+  )
+}
+
 // ── i18n/index.ts patch ─────────────────────────────────────────────────────
 
 async function patchI18n(feature, kebab, i18nPath) {
@@ -958,7 +1095,6 @@ async function patchRouter(Feature, feature, kebab, routerPath) {
 
   // ── Insert imports ──────────────────────────────────────────────────────
   const listingImport = `import ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'`
-  const detailImport = `import ${Feature}DetailPage from '@/modules/${kebab}/${Feature}DetailPage'`
 
   if (content.includes(listingImport)) {
     return { patched: false, reason: 'imports already present' }
@@ -973,7 +1109,7 @@ async function patchRouter(Feature, feature, kebab, routerPath) {
 
   content =
     content.slice(0, exportIdx) +
-    `\nimport ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'\nimport ${Feature}DetailPage from '@/modules/${kebab}/${Feature}DetailPage'` +
+    `\nimport ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'` +
     content.slice(exportIdx)
 
   // ── Insert route entry ──────────────────────────────────────────────────
@@ -987,14 +1123,7 @@ async function patchRouter(Feature, feature, kebab, routerPath) {
   const routeBlock = `          {
             path: '${kebab}',
             handle: { breadcrumb: 'menu.${feature}' },
-            children: [
-              { index: true, element: <${Feature}ListingPage /> },
-              {
-                path: ':id',
-                handle: { dynamicBreadcrumb: true },
-                element: <${Feature}DetailPage />,
-              },
-            ],
+            element: <${Feature}ListingPage />,
           },`
 
   // Find the closing of the MainLayout children by looking for `        ],` after the last route
@@ -1051,7 +1180,7 @@ async function createModule(name) {
   await mkdir(join(modulePath, 'containers'), { recursive: true })
   await mkdir(join('src', 'mock', 'languages', kebab), { recursive: true })
 
-  // ── Write 13 source files ─────────────────────────────────────────────────
+  // ── Write 14 source files ─────────────────────────────────────────────────
   log.section('Generating module files')
 
   const files = [
@@ -1079,7 +1208,17 @@ async function createModule(name) {
       content: tplMainContainer(vars),
     },
     { path: join(modulePath, `${Feature}ListingPage.tsx`), content: tplListingPage(vars) },
-    { path: join(modulePath, `${Feature}DetailPage.tsx`), content: tplDetailPage(vars) },
+    { path: join(modulePath, `${Feature}DetailSheet.tsx`), content: tplDetailSheet(vars) },
+    {
+      path: join(modulePath, '.context.md'),
+      content: tplContextMd({
+        ...vars,
+        plural: toPascal(toPlural(vars.kebab)),
+        apiSlug: toPlural(vars.kebab),
+        camel: vars.feature,
+        date: new Date().toISOString().slice(0, 10),
+      }),
+    },
   ]
 
   for (const { path, content } of files) {
@@ -1117,11 +1256,10 @@ async function createModule(name) {
     log.patched(routerPath)
   } else {
     log.warn(`Router not patched automatically: ${routerResult.reason}`)
-    log.info(`Add these imports to ${routerPath}:`)
+    log.info(`Add this import to ${routerPath}:`)
     console.log(
       C.dim(
-        `  import ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'\n` +
-          `  import ${Feature}DetailPage from '@/modules/${kebab}/${Feature}DetailPage'`
+        `  import ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'`
       )
     )
     log.info(`Add this route inside the MainLayout children array:`)
@@ -1129,10 +1267,7 @@ async function createModule(name) {
       C.dim(`  {
     path: '${kebab}',
     handle: { breadcrumb: 'menu.${feature}' },
-    children: [
-      { index: true, element: <${Feature}ListingPage /> },
-      { path: ':id', handle: { dynamicBreadcrumb: true }, element: <${Feature}DetailPage /> },
-    ],
+    element: <${Feature}ListingPage />,
   },`)
     )
   }
@@ -1149,6 +1284,12 @@ async function createModule(name) {
         `  5. Adjust i18n keys in src/mock/languages/${kebab}/${kebab}-detail.json and ${kebab}-listing.json\n` +
         `  6. Run: npm run dev`
     )
+  )
+  log.warn(
+    `Route slug generated as "/${vars.kebab}". ` +
+    `If the module name is in Portuguese, verify the slug is correct ` +
+    `(e.g. "indicacao" → "indicacoes", not "indicacaos"). ` +
+    `Edit the route in src/core/router/index.tsx if needed.`
   )
 }
 

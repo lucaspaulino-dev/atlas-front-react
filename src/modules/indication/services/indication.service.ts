@@ -71,7 +71,7 @@ function toWritePayload(values: CreateIndicationSchemaValues): ApiWritePayload {
 export async function fetchIndications(
   filter: ListingFilter
 ): Promise<FetchResponse<IndicationRow>> {
-  const { search, page, limit, signal } = filter
+  const { search, page, limit, signal, extraParams } = filter
 
   const response = await httpRequest<ApiIndicationListResponse>(
     'GET',
@@ -82,6 +82,7 @@ export async function fetchIndications(
         page,
         per_page: limit,
         search,
+        ...extraParams,
       },
       signal,
     }

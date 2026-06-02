@@ -1,5 +1,33 @@
 # Governança de Código — atlas-front-react
 
+## Quick Start (Leia Primeiro)
+
+Se você acabou de clonar o repositório, siga estes passos antes de ler qualquer outra coisa:
+
+```bash
+npm install
+cp .env.example .env   # edite VITE_API_URL se necessário
+npm run dev            # http://localhost:5173
+```
+
+Para criar um novo módulo CRUD:
+
+```bash
+npm run atlas -- create module <nome>
+```
+
+**3 regras que nunca podem ser quebradas:**
+
+1. **Sem imports cross-module** — `src/modules/X` nunca importa de `src/modules/Y`. Serviços compartilhados vão para `shared/` ou `core/`.
+2. **Sempre use `httpRequest`** — nunca chame `axios` diretamente. Use `httpRequest<T>` de `@/core/http/request.helper`.
+3. **Sempre use `useListing`** — para qualquer listagem paginada com busca, use o hook `useListing` de `@/shared/hooks/useListing`.
+
+**Módulo de referência:** `src/modules/indication/` é a implementação canônica. Quando tiver dúvida sobre estrutura, copie dali.
+
+O restante deste documento é referência — leia conforme precisar.
+
+---
+
 ## 0. Setup & Desenvolvimento
 
 ### Pré-requisitos
@@ -15,7 +43,11 @@ npm install
 
 ### Variáveis de ambiente
 
-Crie o arquivo `.env` na raiz do projeto `atlas-front-react/`:
+Copie `.env.example` para `.env` na raiz do projeto e ajuste conforme necessário:
+
+```bash
+cp .env.example .env
+```
 
 ```env
 VITE_API_URL=http://localhost:8000/api
@@ -34,7 +66,7 @@ VITE_API_URL=http://localhost:8000/api
 
 ### Atlas CLI — gerador de módulos
 
-O projeto inclui um scaffolder de linha de comando que gera todos os 13 arquivos de boilerplate de um módulo CRUD, cria os arquivos i18n correspondentes, e registra a rota automaticamente.
+O projeto inclui um scaffolder de linha de comando que gera todos os 14 arquivos de boilerplate de um módulo CRUD (incluindo `.context.md`), cria os arquivos i18n correspondentes, e registra a rota automaticamente.
 
 ```bash
 npm run atlas -- create module <nome>
@@ -50,7 +82,7 @@ npm run atlas -- create module product-category
 
 **O que é gerado:**
 
-- `src/modules/<kebab>/` — árvore completa do módulo (13 arquivos)
+- `src/modules/<kebab>/` — árvore completa do módulo (14 arquivos, incluindo `.context.md`)
 - `src/mock/languages/<kebab>/<kebab>-listing.json` — chaves i18n de listagem (pt-BR, en-US, es-ES)
 - `src/mock/languages/<kebab>/<kebab>-detail.json` — chaves i18n de detalhe (pt-BR, en-US, es-ES)
 - Patch em `src/core/i18n/index.ts` — imports e spreads de listing + detail
@@ -73,6 +105,8 @@ localStorage.setItem('atlas-token', 'dev-token')
 ```
 
 Navegue para `http://localhost:5173` após executar o comando. O `ProtectedRoute` lê esse valor e libera o acesso. Remova a chave para testar o fluxo de redirecionamento ao login.
+
+> **Atenção — dívida de segurança:** o token está armazenado em `localStorage`, que é legível por scripts XSS. Este padrão **não deve ser replicado** em novos módulos. Quando o backend de autenticação for implementado, os tokens devem ser armazenados em cookies `httpOnly`.
 
 ### Alias de paths
 
@@ -221,6 +255,10 @@ Conteúdo de `<feature>-listing.json`:
 {
   "pt-BR": {
     "<feature>Listing": {
+      "page": {
+        "title": "<Feature>",
+        "description": "Gerencie os registros de <Feature>",
+      },
       "table": {
         "columns": {
           "name": "Nome",
@@ -333,7 +371,7 @@ export async function fetchIndications(
 **Onde é usado:** `src/shared/hooks/useListing.ts`, consumido em `src/modules/indication/hooks/useIndication.ts`
 
 ```ts
-const { data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload } =
+const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setPage, reload } =
   useListing<IndicationRow>({ fetcher: fetchIndications, enablePagination: true })
 ```
 
@@ -676,11 +714,14 @@ useListing<T>(options: UseListingOptions<T>): {
   data: T[]
   isLoading: boolean
   error: string | null
-  searchQuery: string
-  setSearchQuery: (q: string) => void
+  searchInput: string
+  setSearchInput: (value: string) => void
+  submitSearch: (overrideValue?: string) => void
   pagination: PaginationState
   setPage: (page: number) => void
   reload: () => void
+  extraParams: Record<string, string | string[]> | undefined
+  setExtraParams: (params: Record<string, string | string[]> | undefined) => void
 }
 ```
 
@@ -702,6 +743,7 @@ interface ListingFilter {
   page?: number
   limit?: number
   signal?: AbortSignal
+  extraParams?: Record<string, string | string[]>
 }
 interface UseListingOptions<T> {
   fetcher: (filter: ListingFilter) => Promise<FetchResponse<T>>
@@ -714,10 +756,11 @@ interface UseListingOptions<T> {
 **Uso:**
 
 ```ts
-const { data, isLoading, pagination, setPage, reload } = useListing<MyRow>({
-  fetcher: fetchMyItems,
-  enablePagination: true,
-})
+const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setPage, reload } =
+  useListing<MyRow>({
+    fetcher: fetchMyItems,
+    enablePagination: true,
+  })
 ```
 
 ---
@@ -728,7 +771,7 @@ const { data, isLoading, pagination, setPage, reload } = useListing<MyRow>({
 
 Os componentes shadcn/ui já estão instalados e **customizados** localmente em `src/shared/components/ui/`. Eles são wrappers sobre [Radix UI](https://www.radix-ui.com/) com classes Tailwind aplicadas.
 
-> ⚠️ **Nunca execute `npx shadcn@latest add <componente>`** — esse comando sobrescreve o arquivo local com a versão padrão do shadcn, apagando todas as customizações do projeto.
+> ⚠️ **Nunca execute `npx shadcn@latest add <componente>`** em componentes que já existem em `src/shared/components/ui/` — esse comando sobrescreve o arquivo local com a versão padrão do shadcn, apagando todas as customizações do projeto. Para adicionar um componente **novo** que ainda não existe, o comando é seguro.
 
 Para adicionar um novo componente: copie o arquivo de um componente existente como referência, crie o novo em `src/shared/components/ui/` seguindo o mesmo padrão (`React.forwardRef` + `cn()`), e exporte-o com nome nomeado.
 
@@ -745,6 +788,9 @@ Para adicionar um novo componente: copie o arquivo de um componente existente co
 | `Label`       | `label.tsx`        | `Label`                                                                                                                                          |
 | `RadioGroup`  | `radio-group.tsx`  | `RadioGroup`, `RadioGroupItem`                                                                                                                   |
 | `Select`      | `select.tsx`       | `Select` — wrapper nativo `<select>` HTML, não o Radix Select                                                                                    |
+| `Checkbox`    | `checkbox.tsx`     | `Checkbox`                                                                                                                                       |
+| `Popover`     | `popover.tsx`      | `Popover`, `PopoverTrigger`, `PopoverPortal`, `PopoverContent`                                                                                   |
+| `Sheet`       | `sheet.tsx`        | `Sheet`, `SheetTrigger`, `SheetClose`, `SheetPortal`, `SheetOverlay`, `SheetContent`, `SheetHeader`, `SheetTitle`, `SheetDescription`            |
 | `Spinner`     | `spinner.tsx`      | `Spinner`                                                                                                                                        |
 | `Table`       | `table.tsx`        | `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`                                                                        |
 | `Toast`       | `toast/`           | `toast()` — via `use-toast.ts` (imperativo)                                                                                                      |
@@ -979,19 +1025,23 @@ Componentes de domínio reutilizáveis construídos sobre os primitivos de `ui/`
 import { ListingTable } from '@/shared/components/base/ListingTable'
 ```
 
-| Prop               | Tipo                                          | Obrigatório | Descrição                                                    |
-| ------------------ | --------------------------------------------- | ----------- | ------------------------------------------------------------ |
-| `columns`          | `ColumnDef<TData>[]`                          | sim         | Definição de colunas do TanStack Table                       |
-| `data`             | `TData[]`                                     | sim         | Linhas da tabela                                             |
-| `isLoading`        | `boolean`                                     | não         | Exibe overlay de loading com `Spinner`                       |
-| `enableSearch`     | `boolean`                                     | não         | Habilita o campo de busca na toolbar                         |
-| `enablePagination` | `boolean`                                     | não         | Habilita controles de paginação                              |
-| `pagination`       | `PaginationState`                             | não         | Estado de paginação retornado por `useListing`               |
-| `searchValue`      | `string`                                      | não         | Valor atual do campo de busca                                |
-| `onSearchChange`   | `(value: string) => void`                     | não         | Callback ao digitar na busca                                 |
-| `onPageChange`     | `(page: number) => void`                      | não         | Callback ao trocar de página                                 |
-| `toolbarActions`   | `ReactNode`                                   | não         | Slot direito da toolbar (ex: botão "Novo Registro")          |
-| `renderCell`       | `(columnId: string, row: TData) => ReactNode` | não         | Escape hatch para células customizadas (ex: coluna de ações) |
+| Prop                | Tipo                                          | Obrigatório | Descrição                                                                            |
+| ------------------- | --------------------------------------------- | ----------- | ------------------------------------------------------------------------------------ |
+| `columns`           | `ColumnDef<TData>[]`                          | sim         | Definição de colunas do TanStack Table                                               |
+| `data`              | `TData[]`                                     | sim         | Linhas da tabela                                                                     |
+| `isLoading`         | `boolean`                                     | não         | Exibe overlay de loading com `Spinner`                                               |
+| `enableSearch`      | `boolean`                                     | não         | Habilita o campo de busca na toolbar                                                 |
+| `enablePagination`  | `boolean`                                     | não         | Habilita controles de paginação                                                      |
+| `pagination`        | `PaginationState`                             | não         | Estado de paginação retornado por `useListing`                                       |
+| `searchValue`       | `string`                                      | não         | Valor atual do campo de busca                                                        |
+| `onSearchChange`    | `(value: string) => void`                     | não         | Callback ao digitar na busca                                                         |
+| `onPageChange`      | `(page: number) => void`                      | não         | Callback ao trocar de página                                                         |
+| `onSearchSubmit`    | `(overrideValue?: string) => void`            | não         | Callback ao submeter a busca (botão ou Enter)                                        |
+| `searchSuggestions` | `SearchSuggestion[]`                          | não         | Sugestões do dropdown da SearchBar                                                   |
+| `filters`           | `ReactNode`                                   | não         | Slot de filtros na toolbar (entre SearchBar e toolbarActions); requer `enableSearch` |
+| `activeFilters`     | `ReactNode`                                   | não         | Chips de filtros ativos, renderizados abaixo da toolbar                              |
+| `toolbarActions`    | `ReactNode`                                   | não         | Slot direito da toolbar (ex: botão "Novo Registro")                                  |
+| `renderCell`        | `(columnId: string, row: TData) => ReactNode` | não         | Escape hatch para células customizadas (ex: coluna de ações)                         |
 
 **Uso mínimo:**
 
@@ -1009,13 +1059,16 @@ import { ListingTable } from '@/shared/components/base/ListingTable'
   enableSearch
   enablePagination
   pagination={pagination}
-  searchValue={searchQuery}
-  onSearchChange={setSearchQuery}
+  searchValue={searchInput}
+  onSearchChange={setSearchInput}
+  onSearchSubmit={submitSearch}
   onPageChange={setPage}
   renderCell={(columnId, row) => {
     if (columnId === 'actions') return <ActionsCell row={row} />
     return null
   }}
+  filters={<FilterSheet ... />}
+  activeFilters={<ActiveFilters ... />}
   toolbarActions={<Button onClick={openForm}>Novo Registro</Button>}
 />
 ```
@@ -1089,6 +1142,108 @@ import { ConfirmDialog } from '@/shared/components/base/ConfirmDialog'
   isLoading={isDeleting}
   onConfirm={executeDelete}
 />
+```
+
+---
+
+#### `SearchBar` — campo de busca com sugestões
+
+```tsx
+import { SearchBar } from '@/shared/components/base/SearchBar'
+```
+
+| Prop          | Tipo                               | Obrigatório | Descrição                               |
+| ------------- | ---------------------------------- | ----------- | --------------------------------------- |
+| `value`       | `string`                           | sim         | Valor atual do input                    |
+| `onChange`    | `(value: string) => void`          | sim         | Callback ao digitar                     |
+| `onSubmit`    | `(overrideValue?: string) => void` | sim         | Callback ao submeter (botão ou Enter)   |
+| `suggestions` | `SearchSuggestion[]`               | não         | Opções de sugestão exibidas no dropdown |
+| `placeholder` | `string`                           | não         | Placeholder do input                    |
+| `disabled`    | `boolean`                          | não         | Desabilita o campo                      |
+
+Componente standalone — normalmente encapsulado dentro do `ListingTable` via `enableSearch`.
+
+---
+
+#### `FilterSheet` + `ActiveFilters` — filtros em Sheet lateral
+
+```tsx
+import { FilterSheet, type FilterGroup } from '@/shared/components/base/FilterSheet'
+import { ActiveFilters } from '@/shared/components/base/ActiveFilters'
+```
+
+**`FilterGroup`:**
+
+```ts
+interface FilterGroup {
+  key: string
+  label: string
+  options: { value: string; label: string }[]
+}
+```
+
+**`FilterSheet`** — abre um Sheet lateral com checkboxes por grupo. O estado interno é um rascunho (`draft`); "Filtrar" chama `onApply` e fecha.
+
+| Prop           | Tipo                                        | Obrigatório | Descrição                                      |
+| -------------- | ------------------------------------------- | ----------- | ---------------------------------------------- |
+| `open`         | `boolean`                                   | sim         | Controla visibilidade                          |
+| `onOpenChange` | `(open: boolean) => void`                   | sim         | Callback ao fechar                             |
+| `groups`       | `FilterGroup[]`                             | sim         | Grupos de filtros disponíveis                  |
+| `values`       | `Record<string, string[]>`                  | sim         | Filtros atualmente aplicados (semeiam o draft) |
+| `onApply`      | `(draft: Record<string, string[]>) => void` | sim         | Callback ao confirmar filtros                  |
+| `disabled`     | `boolean`                                   | não         | Desabilita o botão "Filtrar"                   |
+
+**`ActiveFilters`** — renderiza chips removíveis para cada valor de filtro aplicado. Retorna `null` quando não há filtros.
+
+| Prop         | Tipo                                        | Obrigatório | Descrição                               |
+| ------------ | ------------------------------------------- | ----------- | --------------------------------------- |
+| `groups`     | `FilterGroup[]`                             | sim         | Mesmos grupos passados ao `FilterSheet` |
+| `values`     | `Record<string, string[]>`                  | sim         | Filtros atualmente aplicados            |
+| `onRemove`   | `(groupKey: string, value: string) => void` | sim         | Callback ao remover um chip individual  |
+| `onClearAll` | `() => void`                                | sim         | Callback ao limpar todos os filtros     |
+
+**Uso padrão em uma ListingPage:**
+
+```tsx
+const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({})
+
+const filterGroups: FilterGroup[] = [
+  {
+    key: 'status',
+    label: t('myModuleListing.filters.status'),
+    options: [
+      { value: 'active',   label: t('myModuleListing.filters.active') },
+      { value: 'inactive', label: t('myModuleListing.filters.inactive') },
+    ],
+  },
+]
+
+function handleApplyFilters(draft: Record<string, string[]>) {
+  setAppliedFilters(draft)
+  setFilterSheetOpen(false)
+  const extra: Record<string, string[]> = {}
+  for (const [key, vals] of Object.entries(draft)) {
+    if (vals.length > 0) extra[key] = vals
+  }
+  setExtraParams(Object.keys(extra).length > 0 ? extra : undefined)
+}
+
+// Na ListingTable:
+filters={
+  <Button variant="outline" onClick={() => setFilterSheetOpen(true)}>
+    <Filter className="w-4 h-4 mr-2" />
+    {t('common.filters')}
+  </Button>
+}
+activeFilters={
+  <ActiveFilters
+    groups={filterGroups}
+    values={appliedFilters}
+    onRemove={(key, value) => handleApplyFilters({ ...appliedFilters, [key]: appliedFilters[key].filter(v => v !== value) })}
+    onClearAll={() => handleApplyFilters({})}
+  />
+}
 ```
 
 ---
@@ -1293,12 +1448,12 @@ function formatDate(isoString: string): string {
 }
 
 export async function fetch<Feature>s(filter: ListingFilter): Promise<FetchResponse<<Feature>Row>> {
-  const { search, page, limit, signal } = filter
+  const { search, page, limit, signal, extraParams } = filter
   const response = await httpRequest<Api<Feature>ListResponse>(
     'GET',
     '/<api-endpoint>',
     undefined,
-    { params: { page, per_page: limit, search }, signal }
+    { params: { page, per_page: limit, search, ...extraParams }, signal }
   )
   const rows: <Feature>Row[] = response.data.map((item) => ({
     id: item.id,
@@ -1374,7 +1529,7 @@ export function use<Feature>s() {
     { id: 'actions', header: t('<feature>Listing.table.columns.actions') },
   ]
 
-  const { data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload } =
+  const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setExtraParams, setPage, reload } =
     useListing<<Feature>Row>({ fetcher: fetch<Feature>s, enablePagination: true })
 
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
@@ -1403,7 +1558,7 @@ export function use<Feature>s() {
   }, [itemToDelete, reload, t])
 
   return {
-    columns, data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload,
+    columns, data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setExtraParams, setPage, reload,
     isConfirmDialogOpen, setIsConfirmDialogOpen, isDeleting, promptDelete, executeDelete,
   }
 }
@@ -1808,13 +1963,15 @@ import { <Feature>Related<Xxx>Container } from './containers/<Feature>Related<Xx
 
 ```tsx
 // src/modules/<feature>/<Feature>ListingPage.tsx
-import { useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, FileSearch, PlusCircle } from 'lucide-react'
+import { Trash2, FileSearch, PlusCircle, Filter } from 'lucide-react'
 import { use<Feature>s } from './hooks/use<Feature>'
 import { use<Feature>Create } from './hooks/use<Feature>Create'
 import { ListingTable } from '@/shared/components/base/ListingTable'
+import { FilterSheet, type FilterGroup } from '@/shared/components/base/FilterSheet'
+import { ActiveFilters } from '@/shared/components/base/ActiveFilters'
 import { ConfirmDialog } from '@/shared/components/base/ConfirmDialog'
 import { FormDialog } from '@/shared/components/base/FormDialog'
 import { <Feature>CreateForm } from './components/<Feature>CreateForm'
@@ -1826,12 +1983,42 @@ export default function <Feature>ListingPage() {
   const navigate = useNavigate()
 
   const {
-    columns, data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload,
+    columns, data, isLoading, pagination, searchInput, setSearchInput, submitSearch,
+    setExtraParams, setPage, reload,
     isConfirmDialogOpen, setIsConfirmDialogOpen, isDeleting, promptDelete, executeDelete,
   } = use<Feature>s()
 
   const { isFormOpened, isSubmitting, openForm, closeForm, handleSubmit } =
     use<Feature>Create(reload)
+
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({})
+
+  const filterGroups: FilterGroup[] = useMemo(() => [], [])
+
+  const activeFilterCount = Object.values(appliedFilters).flat().length
+
+  function handleApplyFilters(draft: Record<string, string[]>) {
+    setAppliedFilters(draft)
+    setFilterSheetOpen(false)
+    const extra: Record<string, string[]> = {}
+    for (const [key, vals] of Object.entries(draft)) {
+      if (vals.length > 0) extra[key] = vals
+    }
+    setExtraParams(Object.keys(extra).length > 0 ? extra : undefined)
+  }
+
+  function handleRemoveFilter(groupKey: string, value: string) {
+    const updated = {
+      ...appliedFilters,
+      [groupKey]: (appliedFilters[groupKey] ?? []).filter((v) => v !== value),
+    }
+    handleApplyFilters(updated)
+  }
+
+  function handleClearAllFilters() {
+    handleApplyFilters({})
+  }
 
   const renderCell = useCallback(
     (columnId: string, row: <Feature>Row) => {
@@ -1865,6 +2052,16 @@ export default function <Feature>ListingPage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between pb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">{t('<feature>Listing.page.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('<feature>Listing.page.description')}</p>
+        </div>
+        <Button disabled={isLoading} onClick={openForm}>
+          <PlusCircle className="w-4 h-4 mr-2" />
+          {t('common.newRegister')}
+        </Button>
+      </div>
       <ListingTable
         columns={columns}
         data={data}
@@ -1872,15 +2069,29 @@ export default function <Feature>ListingPage() {
         enableSearch
         enablePagination
         pagination={pagination}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearchSubmit={submitSearch}
         onPageChange={setPage}
         renderCell={renderCell}
-        toolbarActions={
-          <Button disabled={isLoading} onClick={openForm}>
-            <PlusCircle className="w-4 h-4 mr-2" />
-            {t('common.newRegister')}
+        filters={
+          <Button variant="outline" disabled={isLoading} onClick={() => setFilterSheetOpen(true)}>
+            <Filter className="w-4 h-4 mr-2" />
+            {t('common.filters')}
+            {activeFilterCount > 0 && (
+              <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
           </Button>
+        }
+        activeFilters={
+          <ActiveFilters
+            groups={filterGroups}
+            values={appliedFilters}
+            onRemove={handleRemoveFilter}
+            onClearAll={handleClearAllFilters}
+          />
         }
       />
 
@@ -1910,10 +2121,34 @@ export default function <Feature>ListingPage() {
           onSubmit={handleSubmit}
         />
       </FormDialog>
+
+      <FilterSheet
+        open={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        groups={filterGroups}
+        values={appliedFilters}
+        onApply={handleApplyFilters}
+        disabled={isLoading}
+      />
     </div>
   )
 }
 ```
+
+---
+
+### DetailPage vs. DetailSheet — guia de decisão
+
+Ao criar um novo módulo, você tem duas opções para o fluxo de detalhe:
+
+| Padrão                                     | Quando usar                                                                              | Como implementar                                                                                                                                 |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **DetailPage** (rota `/:id`)               | O detalhe precisa de URL própria — compartilhável, acessível por link direto, indexável. | Use o boilerplate do Arquivo 13. O scaffolder gera este padrão por padrão.                                                                       |
+| **DetailSheet** (painel lateral, sem rota) | O detalhe é contextual — o usuário abre e fecha sem sair da listagem.                    | Delete `<Feature>DetailPage.tsx` e a rota `/:id` gerada pelo scaffolder. Use `src/modules/indication/IndicationDetailSheet.tsx` como referência. |
+
+**Regra prática:** se o usuário precisar compartilhar um link para o detalhe, use DetailPage. Se não, use DetailSheet.
+
+O scaffolder gera DetailPage por padrão. Se você escolher DetailSheet, delete o arquivo `<Feature>DetailPage.tsx` e remova a rota `{ path: ':id', ... }` do router.
 
 ---
 
@@ -2027,3 +2262,81 @@ Antes de abrir PR, confirme:
 - [ ] `src/mock/languages/<kebab>/<kebab>-detail.json` — chaves de detalhe criadas
 - [ ] Ambos importados e spreados em `src/core/i18n/index.ts`
 - [ ] Chave `menu.<feature>` adicionada em `src/mock/languages/menu/menu.json` (pt-BR, en-US, es-ES)
+
+---
+
+## 6. Convenções Adicionais
+
+### Imports — proibição de barrel files
+
+Não crie arquivos `index.ts` barrel. Todos os imports devem usar o caminho completo do arquivo.
+
+```ts
+// correto
+import { useListing } from '@/shared/hooks/useListing'
+import { Button } from '@/shared/components/ui/button'
+
+// errado — não crie index.ts que reexporta
+import { useListing, Button } from '@/shared'
+```
+
+### Loading state
+
+Use `<Spinner />` para loading de página inteira e para operações assíncronas (ex: submit de formulário). Skeleton screens não estão implementados — se adicionar skeletons no futuro, documente aqui.
+
+```tsx
+// loading de página
+<div className="flex items-center justify-center py-24">
+  <Spinner size="lg" />
+</div>
+
+// loading inline (ex: botão de submit)
+<Spinner size="sm" />
+```
+
+### `toolbarActions` vs. botão no header da página
+
+`ListingTable` aceita uma prop `toolbarActions` que renderiza no lado direito da toolbar da tabela. O boilerplate do Arquivo 12 usa um botão no `<header>` da página (fora da tabela) — ambas as abordagens são aceitas:
+
+- Use **`toolbarActions`** quando a ação está diretamente vinculada à tabela (ex: "Novo Registro" que abre o `FormDialog` da listagem).
+- Use o **header da página** quando a ação é independente da tabela (ex: botão de exportar relatório).
+
+Mantenha consistência dentro do módulo: escolha uma abordagem e use-a em todos os dialogs/actions do mesmo módulo.
+
+### Code Style
+
+ESLint e Prettier estão configurados no projeto.
+
+```bash
+npm run lint     # verifica problemas de linting
+npm run format   # formata o código com Prettier
+```
+
+Execute `npm run lint` antes de abrir um PR. O CI poderá rejeitar PRs com erros de lint.
+
+### Testing
+
+Nenhum runner de testes (Jest/Vitest) está configurado atualmente. O diretório `__mocks__` em `src/modules/indication/hooks/__mocks__/` está reservado para uso futuro.
+
+**Não adicione diretórios `__mocks__` a novos módulos** até que uma estratégia de testes seja definida para o projeto.
+
+### Dívida técnica rastreada
+
+#### Cross-module import em `useDashboardStats`
+
+O hook `src/modules/dashboard/hooks/useDashboardStats.ts` importa de `@/modules/indication/services/indication.service`. Esta é uma violação da regra de isolamento de módulos — rastreada e **não replicável**.
+
+A resolução futura consiste em expor um endpoint `/dashboard/stats` na API e remover a dependência cruzada.
+
+### `ErrorBoundary` — captura de erros de renderização
+
+O componente `ErrorBoundary` em `src/shared/components/base/ErrorBoundary.tsx` envolve o `<Outlet />` no `MainLayout`. Ele evita que um erro de renderização em qualquer módulo derrube toda a aplicação.
+
+```tsx
+import { ErrorBoundary } from '@/shared/components/base/ErrorBoundary'
+
+// uso como wrapper
+;<ErrorBoundary>{children}</ErrorBoundary>
+```
+
+O fallback padrão exibe uma mensagem amigável em português e um botão de recarga. Em ambiente de desenvolvimento (`import.meta.env.DEV`), a mensagem de erro técnica também é exibida abaixo do fallback.

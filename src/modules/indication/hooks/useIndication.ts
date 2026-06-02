@@ -18,8 +18,17 @@ export function useIndications() {
     { id: 'actions', header: t('indicationListing.table.columns.actions') },
   ]
 
-  const { data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload } =
-    useListing<IndicationRow>({ fetcher: fetchIndications, enablePagination: true })
+  const {
+    data,
+    isLoading,
+    pagination,
+    searchInput,
+    setSearchInput,
+    submitSearch,
+    setPage,
+    reload,
+    setExtraParams,
+  } = useListing<IndicationRow>({ fetcher: fetchIndications, enablePagination: true })
 
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -59,10 +68,12 @@ export function useIndications() {
     data,
     isLoading,
     pagination,
-    searchQuery,
-    setSearchQuery,
+    searchInput,
+    setSearchInput,
+    submitSearch,
     setPage,
     reload,
+    setExtraParams,
     isConfirmDialogOpen,
     setIsConfirmDialogOpen,
     isDeleting,

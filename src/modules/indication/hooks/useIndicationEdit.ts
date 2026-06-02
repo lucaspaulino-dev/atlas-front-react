@@ -5,21 +5,23 @@ import type { ApiIndicationDetail } from '../types/indication.type'
 import { toast } from '@/shared/components/ui/toast/use-toast'
 import { updateIndication } from '../services/indication.service'
 
+export type EditSection = 'main' | 'location' | 'organization'
+
 export function useIndicationEdit(onSuccess?: () => void) {
   const { t } = useTranslation()
   const [isFormOpened, setIsFormOpened] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [editTarget, setEditTarget] = useState<ApiIndicationDetail | null>(null)
+  const [editSection, setEditSection] = useState<EditSection>('main')
 
-  const openForm = useCallback((indication: ApiIndicationDetail) => {
+  const openForm = useCallback((indication: ApiIndicationDetail, section: EditSection = 'main') => {
     setEditTarget(indication)
+    setEditSection(section)
     setIsFormOpened(true)
   }, [])
 
   const closeForm = useCallback(() => {
     setIsFormOpened(false)
-    // editTarget is kept until the next openForm call so the Radix exit
-    // animation can finish before the dialog is removed from the tree.
   }, [])
 
   const handleSubmit = useCallback(
@@ -48,5 +50,5 @@ export function useIndicationEdit(onSuccess?: () => void) {
     [editTarget, closeForm, onSuccess, t]
   )
 
-  return { isFormOpened, isSubmitting, editTarget, openForm, closeForm, handleSubmit }
+  return { isFormOpened, isSubmitting, editTarget, editSection, openForm, closeForm, handleSubmit }
 }

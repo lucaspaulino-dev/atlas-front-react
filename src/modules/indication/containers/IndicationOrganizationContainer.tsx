@@ -4,13 +4,14 @@ import type { ApiIndicationDetail } from '../types/indication.type'
 
 interface Props {
   data: ApiIndicationDetail
+  onEdit?: () => void
 }
 
-export function IndicationOrganizationContainer({ data }: Props) {
+export function IndicationOrganizationContainer({ data, onEdit }: Props) {
   const { t } = useTranslation()
 
   return (
-    <DetailContainer title={t('indicationDetail.sections.organization')}>
+    <DetailContainer title={t('indicationDetail.sections.organization')} onEdit={onEdit}>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <DetailField
           label={t('indicationDetail.fields.organizationName')}

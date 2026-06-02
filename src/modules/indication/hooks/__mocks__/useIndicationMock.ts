@@ -1,3 +1,11 @@
+/**
+ * Mock data and fake fetch functions for the indication module.
+ *
+ * NOTE: No test runner (Jest/Vitest) is configured yet.
+ * This file is reserved for future use when a test suite is added.
+ * Do not add __mocks__ directories to new modules until a testing
+ * strategy is defined. See docs/GOVERNANCE.md — "Testing" section.
+ */
 import type { IndicationApiResponse, IndicationRow } from '../../types/indication.type'
 import type { FetchResponse, ListingFilter } from '@/shared/hooks/useListing'
 

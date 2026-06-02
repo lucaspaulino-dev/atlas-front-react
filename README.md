@@ -1,70 +1,39 @@
-# Atlas Front
+# Atlas Territorial do Turismo — Frontend
 
-Frontend da aplicação Atlas, desenvolvido com React, TypeScript e Vite.
-
-## Tecnologias
-
-- **React 19** com StrictMode
-- **TypeScript**
-- **Vite** (bundler)
-- **Tailwind CSS** + **shadcn/ui** (componentes)
-- **React Router DOM** (rotas)
-- **TanStack Table** (tabelas)
-- **React Hook Form** + **Zod** (formulários e validação)
-- **Zustand** (estado global)
-- **Axios** (requisições HTTP)
-- **i18next** (internacionalização)
+Interface web do sistema Atlas, construída em React + TypeScript + Vite.
 
 ## Pré-requisitos
 
-- Node.js 18+
-- npm
+- Node.js 20+
+- npm 10+
 
-## Instalação
+## Início rápido
 
 ```bash
 npm install
+cp .env.example .env   # edite VITE_API_URL se necessário
+npm run dev            # http://localhost:5173
 ```
 
-## Scripts
+## Scaffolder — criar novo módulo
 
-| Comando           | Descrição                            |
-| ----------------- | ------------------------------------ |
-| `npm run dev`     | Inicia o servidor de desenvolvimento |
-| `npm run build`   | Gera o build de produção             |
-| `npm run preview` | Visualiza o build localmente         |
-| `npm run lint`    | Executa o ESLint                     |
-| `npm run format`  | Formata o código com Prettier        |
-
-## Estrutura do projeto
-
-```
-src/
-├── core/
-│   ├── http/        # Configuração do Axios e helpers de requisição
-│   ├── i18n/        # Configuração do i18next
-│   ├── router/      # Definição de rotas
-│   └── store/       # Stores globais (tema, idioma)
-├── modules/
-│   ├── companies/
-│   ├── dashboard/
-│   ├── indication/  # Listagem e criação de indicações
-│   ├── segmentation/
-│   └── tourism/
-└── shared/
-    ├── components/
-    │   ├── base/    # Componentes reutilizáveis (ListingTable, FormDialog, ConfirmDialog)
-    │   ├── layouts/ # Layout principal, header e sidebar
-    │   └── ui/      # Componentes de UI (shadcn/ui)
-    ├── helpers/
-    └── hooks/
+```bash
+npm run atlas -- create module <nome>
 ```
 
-## Qualidade de código
+Gera os 14 arquivos de boilerplate de um módulo CRUD completo (incluindo `.context.md`) e registra a rota e as traduções automaticamente.
 
-O projeto usa **Husky** + **lint-staged** para garantir qualidade antes de cada commit:
+## Documentação
 
-- Arquivos `.ts/.tsx`: ESLint (fix) + Prettier
-- Demais arquivos: Prettier
+Toda a arquitetura, padrões de código e guia de onboarding estão em [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md).
 
-Os hooks são instalados automaticamente via `npm install` (`prepare: husky`).
+O módulo de referência (padrão canônico) é `src/modules/indication/`.
+
+## Comandos
+
+| Comando          | O que faz                           |
+| ---------------- | ----------------------------------- |
+| `npm run dev`    | Servidor de desenvolvimento com HMR |
+| `npm run build`  | Build de produção em `dist/`        |
+| `npm run lint`   | ESLint em todo o projeto            |
+| `npm run format` | Prettier — formata o código         |
