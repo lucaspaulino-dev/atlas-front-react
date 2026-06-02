@@ -590,7 +590,6 @@ function tplListingPage({ Feature, feature, kebab, featurePlural, FeaturePlural 
     `// src/modules/{{kebab}}/{{Feature}}ListingPage.tsx
 import { useState, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { Trash2, FileSearch, PlusCircle, Filter } from 'lucide-react'
 import { use{{FeaturePlural}} } from './hooks/use{{FeaturePlural}}'
 import { use{{Feature}}Create } from './hooks/use{{Feature}}Create'
@@ -600,12 +599,14 @@ import { ActiveFilters } from '@/shared/components/base/ActiveFilters'
 import { ConfirmDialog } from '@/shared/components/base/ConfirmDialog'
 import { FormDialog } from '@/shared/components/base/FormDialog'
 import { {{Feature}}CreateForm } from './components/{{Feature}}CreateForm'
+import { {{Feature}}DetailSheet } from './{{Feature}}DetailSheet'
 import { Button } from '@/shared/components/ui/button'
 import type { {{Feature}}Row } from './types/{{kebab}}.type'
 
 export default function {{Feature}}ListingPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const {
     columns,
@@ -675,7 +676,7 @@ export default function {{Feature}}ListingPage() {
               variant="ghost"
               size="icon"
               className="text-muted-foreground hover:text-primary"
-              onClick={() => navigate(\`/{{kebab}}/\${row.id}\`)}
+              onClick={() => setSelectedId(row.id)}
             >
               <FileSearch className="w-4 h-4" />
             </Button>
@@ -684,7 +685,7 @@ export default function {{Feature}}ListingPage() {
       }
       return null
     },
-    [isLoading, navigate, promptDelete]
+    [isLoading, promptDelete]
   )
 
   return (
@@ -759,6 +760,12 @@ export default function {{Feature}}ListingPage() {
         />
       </FormDialog>
 
+      <{{Feature}}DetailSheet
+        id={selectedId}
+        open={selectedId !== null}
+        onClose={() => setSelectedId(null)}
+      />
+
       <FilterSheet
         open={filterSheetOpen}
         onOpenChange={setFilterSheetOpen}
@@ -775,67 +782,79 @@ export default function {{Feature}}ListingPage() {
   )
 }
 
-function tplDetailPage({ Feature, feature, kebab }) {
+function tplDetailSheet({ Feature, feature, kebab }) {
   return sub(
-    `// src/modules/{{kebab}}/{{Feature}}DetailPage.tsx
-import { useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+    `// src/modules/{{kebab}}/{{Feature}}DetailSheet.tsx
 import { useTranslation } from 'react-i18next'
-import { Button } from '@/shared/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/shared/components/ui/sheet'
 import { Spinner } from '@/shared/components/ui/spinner'
-import { useBreadcrumbStore } from '@/core/store/breadcrumb.store'
 import { FormDialog } from '@/shared/components/base/FormDialog'
 import { {{Feature}}MainContainer } from './containers/{{Feature}}MainContainer'
 import { {{Feature}}EditForm } from './components/{{Feature}}EditForm'
 import { use{{Feature}}Detail } from './hooks/use{{Feature}}Detail'
 import { use{{Feature}}Edit } from './hooks/use{{Feature}}Edit'
 
-export default function {{Feature}}DetailPage() {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
-  const { id } = useParams<{ id: string }>()
+interface Props {
+  id: number | null
+  open: boolean
+  onClose: () => void
+}
 
-  const { data, isLoading, error, reload } = use{{Feature}}Detail(Number(id))
+export function {{Feature}}DetailSheet({ id, open, onClose }: Props) {
+  const { t } = useTranslation()
+
+  const { data, isLoading, error, reload } = use{{Feature}}Detail(id ?? 0)
   const { isFormOpened, isSubmitting, editTarget, openForm, closeForm, handleSubmit } =
     use{{Feature}}Edit(reload)
 
-  const setTitle = useBreadcrumbStore((s) => s.setTitle)
-  const clearTitle = useBreadcrumbStore((s) => s.clearTitle)
+  function renderBody() {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center flex-1 py-24">
+          <Spinner size="lg" />
+        </div>
+      )
+    }
 
-  useEffect(() => {
-    // Identifique o campo primário não-nulo do recurso e use-o como breadcrumb.
-    // - Se "name" nunca é null: setTitle(data.name)
-    // - Se "name" é string | null e existe campo alternativo (ex: acronym, code, ip):
-    //   setTitle(data.acronym)
-    // - Se não há alternativa: setTitle(data.name ?? String(data.id))
-    if (data) setTitle(data.name)
-    return () => clearTitle()
-  }, [data, setTitle, clearTitle])
+    if (error || !data) {
+      return (
+        <div className="flex items-center justify-center flex-1 py-24">
+          <span className="text-sm text-destructive">{t('common.errorMessage')}</span>
+        </div>
+      )
+    }
 
-  if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner size="lg" />
-      </div>
-    )
-  }
-
-  if (error || !data) {
-    return (
-      <div className="flex flex-col items-center gap-4 py-16">
-        {/* Nunca renderize \`error\` diretamente — o valor é um sentinel interno do hook,
-            não uma mensagem para o usuário. Use sempre a chave i18n. */}
-        <span className="text-sm text-destructive">{t('common.errorMessage')}</span>
-        <Button variant="ghost" size="sm" onClick={() => navigate('/{{kebab}}')}>
-          {t('{{feature}}Detail.backToList')}
-        </Button>
+      <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <{{Feature}}MainContainer data={data} onEdit={() => openForm(data)} />
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <{{Feature}}MainContainer data={data} onEdit={() => openForm(data)} />
+    <>
+      <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+        <SheetContent>
+          <SheetHeader className="pr-10">
+            <SheetTitle className="truncate">
+              {isLoading ? t('common.loading') : (data?.name ?? '—')}
+            </SheetTitle>
+            {data && (
+              <SheetDescription>
+                {t('{{feature}}Detail.fields.id')}: {data.id}
+              </SheetDescription>
+            )}
+          </SheetHeader>
+
+          {renderBody()}
+        </SheetContent>
+      </Sheet>
 
       <FormDialog
         open={isFormOpened}
@@ -854,7 +873,7 @@ export default function {{Feature}}DetailPage() {
           />
         )}
       </FormDialog>
-    </div>
+    </>
   )
 }
 `,
@@ -1014,7 +1033,7 @@ function tplContextMd({ Feature, kebab, camel, plural, apiSlug, date }) {
 ## Summary
 
 - {{Feature}}ListingPage.tsx — listing page with search, filters, and pagination
-- {{Feature}}DetailPage.tsx — detail view with edit form (see decision note below)
+- {{Feature}}DetailSheet.tsx — slide-over detail panel (opens from the listing, no /:id route)
 - types/{{kebab}}.type.ts — API and domain type interfaces
 - schemas/{{kebab}}.schema.ts — Zod validation schemas with i18n error messages
 - services/{{kebab}}.service.ts — pure async functions via httpRequest
@@ -1029,10 +1048,9 @@ function tplContextMd({ Feature, kebab, camel, plural, apiSlug, date }) {
 
 ## Notes
 
-- DetailPage vs DetailSheet: the scaffolder generates {{Feature}}DetailPage.tsx with
-  a /:id route by default. If you want a side-panel detail (like the "indication"
-  module), delete {{Feature}}DetailPage.tsx and the /:id route, then use
-  src/modules/indication/IndicationDetailSheet.tsx as a reference.
+- DetailSheet is generated by default (no /:id route). If you need a routed detail
+  page instead, delete {{Feature}}DetailSheet.tsx, add a {{Feature}}DetailPage.tsx
+  following GOVERNANCE.md Arquivo 13, and add the /:id route to the router.
 - API endpoint: update the endpoint slug in services/{{kebab}}.service.ts
   (generated as /{{apiSlug}}).
 - i18n: fill in the keys generated in src/mock/languages/{{kebab}}/.
@@ -1077,7 +1095,6 @@ async function patchRouter(Feature, feature, kebab, routerPath) {
 
   // ── Insert imports ──────────────────────────────────────────────────────
   const listingImport = `import ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'`
-  const detailImport = `import ${Feature}DetailPage from '@/modules/${kebab}/${Feature}DetailPage'`
 
   if (content.includes(listingImport)) {
     return { patched: false, reason: 'imports already present' }
@@ -1092,7 +1109,7 @@ async function patchRouter(Feature, feature, kebab, routerPath) {
 
   content =
     content.slice(0, exportIdx) +
-    `\nimport ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'\nimport ${Feature}DetailPage from '@/modules/${kebab}/${Feature}DetailPage'` +
+    `\nimport ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'` +
     content.slice(exportIdx)
 
   // ── Insert route entry ──────────────────────────────────────────────────
@@ -1106,14 +1123,7 @@ async function patchRouter(Feature, feature, kebab, routerPath) {
   const routeBlock = `          {
             path: '${kebab}',
             handle: { breadcrumb: 'menu.${feature}' },
-            children: [
-              { index: true, element: <${Feature}ListingPage /> },
-              {
-                path: ':id',
-                handle: { dynamicBreadcrumb: true },
-                element: <${Feature}DetailPage />,
-              },
-            ],
+            element: <${Feature}ListingPage />,
           },`
 
   // Find the closing of the MainLayout children by looking for `        ],` after the last route
@@ -1198,7 +1208,7 @@ async function createModule(name) {
       content: tplMainContainer(vars),
     },
     { path: join(modulePath, `${Feature}ListingPage.tsx`), content: tplListingPage(vars) },
-    { path: join(modulePath, `${Feature}DetailPage.tsx`), content: tplDetailPage(vars) },
+    { path: join(modulePath, `${Feature}DetailSheet.tsx`), content: tplDetailSheet(vars) },
     {
       path: join(modulePath, '.context.md'),
       content: tplContextMd({
@@ -1246,11 +1256,10 @@ async function createModule(name) {
     log.patched(routerPath)
   } else {
     log.warn(`Router not patched automatically: ${routerResult.reason}`)
-    log.info(`Add these imports to ${routerPath}:`)
+    log.info(`Add this import to ${routerPath}:`)
     console.log(
       C.dim(
-        `  import ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'\n` +
-          `  import ${Feature}DetailPage from '@/modules/${kebab}/${Feature}DetailPage'`
+        `  import ${Feature}ListingPage from '@/modules/${kebab}/${Feature}ListingPage'`
       )
     )
     log.info(`Add this route inside the MainLayout children array:`)
@@ -1258,10 +1267,7 @@ async function createModule(name) {
       C.dim(`  {
     path: '${kebab}',
     handle: { breadcrumb: 'menu.${feature}' },
-    children: [
-      { index: true, element: <${Feature}ListingPage /> },
-      { path: ':id', handle: { dynamicBreadcrumb: true }, element: <${Feature}DetailPage /> },
-    ],
+    element: <${Feature}ListingPage />,
   },`)
     )
   }
@@ -1278,12 +1284,6 @@ async function createModule(name) {
         `  5. Adjust i18n keys in src/mock/languages/${kebab}/${kebab}-detail.json and ${kebab}-listing.json\n` +
         `  6. Run: npm run dev`
     )
-  )
-  log.warn(
-    `DetailPage + /:id route generated by default. ` +
-    `If you want a side-panel detail (like "indication"), ` +
-    `delete ${vars.Feature}DetailPage.tsx and the /:id route, ` +
-    `then use IndicationDetailSheet.tsx as a reference.`
   )
   log.warn(
     `Route slug generated as "/${vars.kebab}". ` +
