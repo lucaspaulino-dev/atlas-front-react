@@ -46,14 +46,16 @@ src/
 │   ├── router/      # Definição de rotas
 │   └── store/       # Stores globais (tema, idioma)
 ├── modules/
+│   ├── auth/
+│   ├── branding/    # Configurações de branding dinâmico
 │   ├── companies/
 │   ├── dashboard/
-│   ├── indication/  # Listagem e criação de indicações
+│   ├── indication/  # CRUD completo com sheet de detalhe e filtros
 │   ├── segmentation/
 │   └── tourism/
 └── shared/
     ├── components/
-    │   ├── base/    # Componentes reutilizáveis (ListingTable, FormDialog, ConfirmDialog)
+    │   ├── base/    # Componentes reutilizáveis (ListingTable, FormDialog, ConfirmDialog, SearchBar, FilterSheet, ActiveFilters)
     │   ├── layouts/ # Layout principal, header e sidebar
     │   └── ui/      # Componentes de UI (shadcn/ui)
     ├── helpers/

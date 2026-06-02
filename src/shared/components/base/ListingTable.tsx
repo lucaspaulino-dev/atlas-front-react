@@ -1,7 +1,6 @@
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/shared/components/ui/button'
-import { Input } from '@/shared/components/ui/input'
 import { Spinner } from '@/shared/components/ui/spinner'
 import {
   Table,
@@ -11,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/shared/components/ui/table'
+import { SearchBar, type SearchSuggestion } from './SearchBar'
 import type { PaginationState } from '@/shared/hooks/useListing'
 
 interface ListingTableProps<TData> {
@@ -22,8 +22,12 @@ interface ListingTableProps<TData> {
   pagination?: PaginationState
   searchValue?: string
   onSearchChange?: (value: string) => void
+  onSearchSubmit?: (overrideValue?: string) => void
+  searchSuggestions?: SearchSuggestion[]
   onPageChange?: (page: number) => void
+  filters?: React.ReactNode
   toolbarActions?: React.ReactNode
+  activeFilters?: React.ReactNode
   renderCell?: (columnId: string, row: TData) => React.ReactNode
 }
 
@@ -36,8 +40,12 @@ export function ListingTable<TData>({
   pagination,
   searchValue = '',
   onSearchChange,
+  onSearchSubmit,
+  searchSuggestions,
   onPageChange,
+  filters,
   toolbarActions,
+  activeFilters,
   renderCell,
 }: ListingTableProps<TData>) {
   const { t } = useTranslation()
@@ -53,17 +61,20 @@ export function ListingTable<TData>({
   return (
     <div className="space-y-4">
       {enableSearch && (
-        <div className="flex items-center justify-between">
-          <Input
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <SearchBar
             value={searchValue}
-            placeholder={t('common.searchPlaceholder')}
-            className="max-w-sm"
+            onChange={(v) => onSearchChange?.(v)}
+            onSubmit={(override) => onSearchSubmit?.(override)}
+            suggestions={searchSuggestions}
             disabled={isLoading}
-            onChange={(e) => onSearchChange?.(e.target.value)}
           />
+          {filters && <div className="flex items-center gap-2">{filters}</div>}
           {toolbarActions && <div>{toolbarActions}</div>}
         </div>
       )}
+
+      {activeFilters && <div>{activeFilters}</div>}
 
       <div className="rounded-md border border-border bg-card overflow-hidden relative">
         {isLoading && (

@@ -1,6 +1,14 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { CircleHelp, LayoutDashboard, Home, GlobeIcon, Store, Backpack } from 'lucide-react'
+import {
+  CircleHelp,
+  LayoutDashboard,
+  Home,
+  GlobeIcon,
+  Store,
+  Backpack,
+  Settings,
+} from 'lucide-react'
 import logoLight from '@/assets/img/geral/logo.png'
 import logoDark from '@/assets/img/geral/logo-dark.png'
 import { useThemeStore } from '@/core/store/theme.store'
@@ -11,6 +19,7 @@ const menuItems = (t: (key: string) => string) => [
   { name: t('menu.indication'), icon: GlobeIcon, path: '/indicacao-geografica' },
   { name: t('menu.segmentation'), icon: Store, path: '/segmentacao-de-loja' },
   { name: t('menu.tourism'), icon: Backpack, path: '/turismo' },
+  { name: t('menu.branding'), icon: Settings, path: '/configuracoes' },
 ]
 
 export function SideBar() {

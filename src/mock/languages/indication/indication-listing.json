@@ -45,6 +45,11 @@
       "edit": {
         "title": "Editar Indicação Geográfica",
         "description": "Atualize os dados da indicação geográfica"
+      },
+      "filters": {
+        "status": "Status",
+        "active": "Ativo",
+        "inactive": "Inativo"
       }
     }
   },

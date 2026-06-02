@@ -11,6 +11,7 @@
         "confirm": "Sim, excluir",
         "cancel": "Cancelar"
       },
+      "search": "Buscar",
       "searchPlaceholder": "Buscar...",
       "textLoaderRequest": "Buscando registros...",
       "emptyListing": "Nenhum registro encontrado.",
@@ -39,6 +40,12 @@
         "recentIndications": "Indicações Recentes",
         "noData": "Nenhum dado disponível."
       },
+      "filters": "Filtros",
+      "filter": {
+        "clear": "Limpar",
+        "clearAll": "Limpar tudo",
+        "apply": "Filtrar"
+      },
       "header": {
         "user": {
           "name": "Admin",
@@ -59,6 +66,7 @@
         "confirm": "Yes, delete",
         "cancel": "Cancel"
       },
+      "search": "Search",
       "searchPlaceholder": "Search...",
       "textLoaderRequest": "Fetching records...",
       "emptyListing": "No records found.",
@@ -87,6 +95,9 @@
         "recentIndications": "Recent Indications",
         "noData": "No data available."
       },
+      "filter": {
+        "clear": "Clear"
+      },
       "header": {
         "user": {
           "name": "Admin",
@@ -107,6 +118,7 @@
         "confirm": "Sí, eliminar",
         "cancel": "Cancelar"
       },
+      "search": "Buscar",
       "searchPlaceholder": "Buscar...",
       "textLoaderRequest": "Buscando registros...",
       "emptyListing": "No se encontraron registros.",
@@ -134,6 +146,9 @@
         "comingSoon": "Próximamente",
         "recentIndications": "Indicaciones Recientes",
         "noData": "No hay datos disponibles."
+      },
+      "filter": {
+        "clear": "Limpiar"
       },
       "header": {
         "user": {

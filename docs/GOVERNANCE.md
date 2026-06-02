@@ -333,7 +333,7 @@ export async function fetchIndications(
 **Onde é usado:** `src/shared/hooks/useListing.ts`, consumido em `src/modules/indication/hooks/useIndication.ts`
 
 ```ts
-const { data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload } =
+const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setPage, reload } =
   useListing<IndicationRow>({ fetcher: fetchIndications, enablePagination: true })
 ```
 
@@ -676,11 +676,14 @@ useListing<T>(options: UseListingOptions<T>): {
   data: T[]
   isLoading: boolean
   error: string | null
-  searchQuery: string
-  setSearchQuery: (q: string) => void
+  searchInput: string
+  setSearchInput: (value: string) => void
+  submitSearch: (overrideValue?: string) => void
   pagination: PaginationState
   setPage: (page: number) => void
   reload: () => void
+  extraParams: Record<string, string | string[]> | undefined
+  setExtraParams: (params: Record<string, string | string[]> | undefined) => void
 }
 ```
 
@@ -702,6 +705,7 @@ interface ListingFilter {
   page?: number
   limit?: number
   signal?: AbortSignal
+  extraParams?: Record<string, string | string[]>
 }
 interface UseListingOptions<T> {
   fetcher: (filter: ListingFilter) => Promise<FetchResponse<T>>
@@ -714,10 +718,11 @@ interface UseListingOptions<T> {
 **Uso:**
 
 ```ts
-const { data, isLoading, pagination, setPage, reload } = useListing<MyRow>({
-  fetcher: fetchMyItems,
-  enablePagination: true,
-})
+const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setPage, reload } =
+  useListing<MyRow>({
+    fetcher: fetchMyItems,
+    enablePagination: true,
+  })
 ```
 
 ---
@@ -728,7 +733,7 @@ const { data, isLoading, pagination, setPage, reload } = useListing<MyRow>({
 
 Os componentes shadcn/ui já estão instalados e **customizados** localmente em `src/shared/components/ui/`. Eles são wrappers sobre [Radix UI](https://www.radix-ui.com/) com classes Tailwind aplicadas.
 
-> ⚠️ **Nunca execute `npx shadcn@latest add <componente>`** — esse comando sobrescreve o arquivo local com a versão padrão do shadcn, apagando todas as customizações do projeto.
+> ⚠️ **Nunca execute `npx shadcn@latest add <componente>`** em componentes que já existem em `src/shared/components/ui/` — esse comando sobrescreve o arquivo local com a versão padrão do shadcn, apagando todas as customizações do projeto. Para adicionar um componente **novo** que ainda não existe, o comando é seguro.
 
 Para adicionar um novo componente: copie o arquivo de um componente existente como referência, crie o novo em `src/shared/components/ui/` seguindo o mesmo padrão (`React.forwardRef` + `cn()`), e exporte-o com nome nomeado.
 
@@ -745,6 +750,9 @@ Para adicionar um novo componente: copie o arquivo de um componente existente co
 | `Label`       | `label.tsx`        | `Label`                                                                                                                                          |
 | `RadioGroup`  | `radio-group.tsx`  | `RadioGroup`, `RadioGroupItem`                                                                                                                   |
 | `Select`      | `select.tsx`       | `Select` — wrapper nativo `<select>` HTML, não o Radix Select                                                                                    |
+| `Checkbox`    | `checkbox.tsx`     | `Checkbox`                                                                                                                                       |
+| `Popover`     | `popover.tsx`      | `Popover`, `PopoverTrigger`, `PopoverPortal`, `PopoverContent`                                                                                   |
+| `Sheet`       | `sheet.tsx`        | `Sheet`, `SheetTrigger`, `SheetClose`, `SheetPortal`, `SheetOverlay`, `SheetContent`, `SheetHeader`, `SheetTitle`, `SheetDescription`            |
 | `Spinner`     | `spinner.tsx`      | `Spinner`                                                                                                                                        |
 | `Table`       | `table.tsx`        | `Table`, `TableHeader`, `TableBody`, `TableRow`, `TableHead`, `TableCell`                                                                        |
 | `Toast`       | `toast/`           | `toast()` — via `use-toast.ts` (imperativo)                                                                                                      |
@@ -979,19 +987,23 @@ Componentes de domínio reutilizáveis construídos sobre os primitivos de `ui/`
 import { ListingTable } from '@/shared/components/base/ListingTable'
 ```
 
-| Prop               | Tipo                                          | Obrigatório | Descrição                                                    |
-| ------------------ | --------------------------------------------- | ----------- | ------------------------------------------------------------ |
-| `columns`          | `ColumnDef<TData>[]`                          | sim         | Definição de colunas do TanStack Table                       |
-| `data`             | `TData[]`                                     | sim         | Linhas da tabela                                             |
-| `isLoading`        | `boolean`                                     | não         | Exibe overlay de loading com `Spinner`                       |
-| `enableSearch`     | `boolean`                                     | não         | Habilita o campo de busca na toolbar                         |
-| `enablePagination` | `boolean`                                     | não         | Habilita controles de paginação                              |
-| `pagination`       | `PaginationState`                             | não         | Estado de paginação retornado por `useListing`               |
-| `searchValue`      | `string`                                      | não         | Valor atual do campo de busca                                |
-| `onSearchChange`   | `(value: string) => void`                     | não         | Callback ao digitar na busca                                 |
-| `onPageChange`     | `(page: number) => void`                      | não         | Callback ao trocar de página                                 |
-| `toolbarActions`   | `ReactNode`                                   | não         | Slot direito da toolbar (ex: botão "Novo Registro")          |
-| `renderCell`       | `(columnId: string, row: TData) => ReactNode` | não         | Escape hatch para células customizadas (ex: coluna de ações) |
+| Prop                | Tipo                                          | Obrigatório | Descrição                                                                            |
+| ------------------- | --------------------------------------------- | ----------- | ------------------------------------------------------------------------------------ |
+| `columns`           | `ColumnDef<TData>[]`                          | sim         | Definição de colunas do TanStack Table                                               |
+| `data`              | `TData[]`                                     | sim         | Linhas da tabela                                                                     |
+| `isLoading`         | `boolean`                                     | não         | Exibe overlay de loading com `Spinner`                                               |
+| `enableSearch`      | `boolean`                                     | não         | Habilita o campo de busca na toolbar                                                 |
+| `enablePagination`  | `boolean`                                     | não         | Habilita controles de paginação                                                      |
+| `pagination`        | `PaginationState`                             | não         | Estado de paginação retornado por `useListing`                                       |
+| `searchValue`       | `string`                                      | não         | Valor atual do campo de busca                                                        |
+| `onSearchChange`    | `(value: string) => void`                     | não         | Callback ao digitar na busca                                                         |
+| `onPageChange`      | `(page: number) => void`                      | não         | Callback ao trocar de página                                                         |
+| `onSearchSubmit`    | `(overrideValue?: string) => void`            | não         | Callback ao submeter a busca (botão ou Enter)                                        |
+| `searchSuggestions` | `SearchSuggestion[]`                          | não         | Sugestões do dropdown da SearchBar                                                   |
+| `filters`           | `ReactNode`                                   | não         | Slot de filtros na toolbar (entre SearchBar e toolbarActions); requer `enableSearch` |
+| `activeFilters`     | `ReactNode`                                   | não         | Chips de filtros ativos, renderizados abaixo da toolbar                              |
+| `toolbarActions`    | `ReactNode`                                   | não         | Slot direito da toolbar (ex: botão "Novo Registro")                                  |
+| `renderCell`        | `(columnId: string, row: TData) => ReactNode` | não         | Escape hatch para células customizadas (ex: coluna de ações)                         |
 
 **Uso mínimo:**
 
@@ -1009,13 +1021,16 @@ import { ListingTable } from '@/shared/components/base/ListingTable'
   enableSearch
   enablePagination
   pagination={pagination}
-  searchValue={searchQuery}
-  onSearchChange={setSearchQuery}
+  searchValue={searchInput}
+  onSearchChange={setSearchInput}
+  onSearchSubmit={submitSearch}
   onPageChange={setPage}
   renderCell={(columnId, row) => {
     if (columnId === 'actions') return <ActionsCell row={row} />
     return null
   }}
+  filters={<FilterSheet ... />}
+  activeFilters={<ActiveFilters ... />}
   toolbarActions={<Button onClick={openForm}>Novo Registro</Button>}
 />
 ```
@@ -1089,6 +1104,108 @@ import { ConfirmDialog } from '@/shared/components/base/ConfirmDialog'
   isLoading={isDeleting}
   onConfirm={executeDelete}
 />
+```
+
+---
+
+#### `SearchBar` — campo de busca com sugestões
+
+```tsx
+import { SearchBar } from '@/shared/components/base/SearchBar'
+```
+
+| Prop          | Tipo                               | Obrigatório | Descrição                               |
+| ------------- | ---------------------------------- | ----------- | --------------------------------------- |
+| `value`       | `string`                           | sim         | Valor atual do input                    |
+| `onChange`    | `(value: string) => void`          | sim         | Callback ao digitar                     |
+| `onSubmit`    | `(overrideValue?: string) => void` | sim         | Callback ao submeter (botão ou Enter)   |
+| `suggestions` | `SearchSuggestion[]`               | não         | Opções de sugestão exibidas no dropdown |
+| `placeholder` | `string`                           | não         | Placeholder do input                    |
+| `disabled`    | `boolean`                          | não         | Desabilita o campo                      |
+
+Componente standalone — normalmente encapsulado dentro do `ListingTable` via `enableSearch`.
+
+---
+
+#### `FilterSheet` + `ActiveFilters` — filtros em Sheet lateral
+
+```tsx
+import { FilterSheet, type FilterGroup } from '@/shared/components/base/FilterSheet'
+import { ActiveFilters } from '@/shared/components/base/ActiveFilters'
+```
+
+**`FilterGroup`:**
+
+```ts
+interface FilterGroup {
+  key: string
+  label: string
+  options: { value: string; label: string }[]
+}
+```
+
+**`FilterSheet`** — abre um Sheet lateral com checkboxes por grupo. O estado interno é um rascunho (`draft`); "Filtrar" chama `onApply` e fecha.
+
+| Prop           | Tipo                                        | Obrigatório | Descrição                                      |
+| -------------- | ------------------------------------------- | ----------- | ---------------------------------------------- |
+| `open`         | `boolean`                                   | sim         | Controla visibilidade                          |
+| `onOpenChange` | `(open: boolean) => void`                   | sim         | Callback ao fechar                             |
+| `groups`       | `FilterGroup[]`                             | sim         | Grupos de filtros disponíveis                  |
+| `values`       | `Record<string, string[]>`                  | sim         | Filtros atualmente aplicados (semeiam o draft) |
+| `onApply`      | `(draft: Record<string, string[]>) => void` | sim         | Callback ao confirmar filtros                  |
+| `disabled`     | `boolean`                                   | não         | Desabilita o botão "Filtrar"                   |
+
+**`ActiveFilters`** — renderiza chips removíveis para cada valor de filtro aplicado. Retorna `null` quando não há filtros.
+
+| Prop         | Tipo                                        | Obrigatório | Descrição                               |
+| ------------ | ------------------------------------------- | ----------- | --------------------------------------- |
+| `groups`     | `FilterGroup[]`                             | sim         | Mesmos grupos passados ao `FilterSheet` |
+| `values`     | `Record<string, string[]>`                  | sim         | Filtros atualmente aplicados            |
+| `onRemove`   | `(groupKey: string, value: string) => void` | sim         | Callback ao remover um chip individual  |
+| `onClearAll` | `() => void`                                | sim         | Callback ao limpar todos os filtros     |
+
+**Uso padrão em uma ListingPage:**
+
+```tsx
+const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({})
+
+const filterGroups: FilterGroup[] = [
+  {
+    key: 'status',
+    label: t('myModuleListing.filters.status'),
+    options: [
+      { value: 'active',   label: t('myModuleListing.filters.active') },
+      { value: 'inactive', label: t('myModuleListing.filters.inactive') },
+    ],
+  },
+]
+
+function handleApplyFilters(draft: Record<string, string[]>) {
+  setAppliedFilters(draft)
+  setFilterSheetOpen(false)
+  const extra: Record<string, string[]> = {}
+  for (const [key, vals] of Object.entries(draft)) {
+    if (vals.length > 0) extra[key] = vals
+  }
+  setExtraParams(Object.keys(extra).length > 0 ? extra : undefined)
+}
+
+// Na ListingTable:
+filters={
+  <Button variant="outline" onClick={() => setFilterSheetOpen(true)}>
+    <Filter className="w-4 h-4 mr-2" />
+    {t('common.filters')}
+  </Button>
+}
+activeFilters={
+  <ActiveFilters
+    groups={filterGroups}
+    values={appliedFilters}
+    onRemove={(key, value) => handleApplyFilters({ ...appliedFilters, [key]: appliedFilters[key].filter(v => v !== value) })}
+    onClearAll={() => handleApplyFilters({})}
+  />
+}
 ```
 
 ---
@@ -1293,12 +1410,12 @@ function formatDate(isoString: string): string {
 }
 
 export async function fetch<Feature>s(filter: ListingFilter): Promise<FetchResponse<<Feature>Row>> {
-  const { search, page, limit, signal } = filter
+  const { search, page, limit, signal, extraParams } = filter
   const response = await httpRequest<Api<Feature>ListResponse>(
     'GET',
     '/<api-endpoint>',
     undefined,
-    { params: { page, per_page: limit, search }, signal }
+    { params: { page, per_page: limit, search, ...extraParams }, signal }
   )
   const rows: <Feature>Row[] = response.data.map((item) => ({
     id: item.id,
@@ -1374,7 +1491,7 @@ export function use<Feature>s() {
     { id: 'actions', header: t('<feature>Listing.table.columns.actions') },
   ]
 
-  const { data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload } =
+  const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setExtraParams, setPage, reload } =
     useListing<<Feature>Row>({ fetcher: fetch<Feature>s, enablePagination: true })
 
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
@@ -1403,7 +1520,7 @@ export function use<Feature>s() {
   }, [itemToDelete, reload, t])
 
   return {
-    columns, data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload,
+    columns, data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setExtraParams, setPage, reload,
     isConfirmDialogOpen, setIsConfirmDialogOpen, isDeleting, promptDelete, executeDelete,
   }
 }
@@ -1826,7 +1943,7 @@ export default function <Feature>ListingPage() {
   const navigate = useNavigate()
 
   const {
-    columns, data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload,
+    columns, data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setPage, reload,
     isConfirmDialogOpen, setIsConfirmDialogOpen, isDeleting, promptDelete, executeDelete,
   } = use<Feature>s()
 
@@ -1872,8 +1989,9 @@ export default function <Feature>ListingPage() {
         enableSearch
         enablePagination
         pagination={pagination}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearchSubmit={submitSearch}
         onPageChange={setPage}
         renderCell={renderCell}
         toolbarActions={

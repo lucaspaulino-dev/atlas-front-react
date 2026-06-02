@@ -149,12 +149,12 @@ function formatDate(isoString: string): string {
 }
 
 export async function fetch{{FeaturePlural}}(filter: ListingFilter): Promise<FetchResponse<{{Feature}}Row>> {
-  const { search, page, limit, signal } = filter
+  const { search, page, limit, signal, extraParams } = filter
   const response = await httpRequest<Api{{Feature}}ListResponse>(
     'GET',
     '/{{apiSlug}}',
     undefined,
-    { params: { page, per_page: limit, search }, signal }
+    { params: { page, per_page: limit, search, ...extraParams }, signal }
   )
   const rows: {{Feature}}Row[] = response.data.map((item) => ({
     id: item.id,
@@ -218,7 +218,7 @@ export function use{{FeaturePlural}}() {
     { id: 'actions', header: t('{{feature}}Listing.table.columns.actions') },
   ]
 
-  const { data, isLoading, pagination, searchQuery, setSearchQuery, setPage, reload } =
+  const { data, isLoading, pagination, searchInput, setSearchInput, submitSearch, setExtraParams, setPage, reload } =
     useListing<{{Feature}}Row>({ fetcher: fetch{{FeaturePlural}}, enablePagination: true })
 
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
@@ -251,8 +251,10 @@ export function use{{FeaturePlural}}() {
     data,
     isLoading,
     pagination,
-    searchQuery,
-    setSearchQuery,
+    searchInput,
+    setSearchInput,
+    submitSearch,
+    setExtraParams,
     setPage,
     reload,
     isConfirmDialogOpen,
@@ -608,8 +610,9 @@ export default function {{Feature}}ListingPage() {
     data,
     isLoading,
     pagination,
-    searchQuery,
-    setSearchQuery,
+    searchInput,
+    setSearchInput,
+    submitSearch,
     setPage,
     reload,
     isConfirmDialogOpen,
@@ -661,8 +664,9 @@ export default function {{Feature}}ListingPage() {
         enableSearch
         enablePagination
         pagination={pagination}
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        onSearchSubmit={submitSearch}
         onPageChange={setPage}
         renderCell={renderCell}
         toolbarActions={
