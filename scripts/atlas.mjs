@@ -588,13 +588,15 @@ export function {{Feature}}MainContainer({ data, onEdit }: Props) {
 function tplListingPage({ Feature, feature, kebab, featurePlural, FeaturePlural }) {
   return sub(
     `// src/modules/{{kebab}}/{{Feature}}ListingPage.tsx
-import { useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, FileSearch, PlusCircle } from 'lucide-react'
+import { Trash2, FileSearch, PlusCircle, Filter } from 'lucide-react'
 import { use{{FeaturePlural}} } from './hooks/use{{FeaturePlural}}'
 import { use{{Feature}}Create } from './hooks/use{{Feature}}Create'
 import { ListingTable } from '@/shared/components/base/ListingTable'
+import { FilterSheet, type FilterGroup } from '@/shared/components/base/FilterSheet'
+import { ActiveFilters } from '@/shared/components/base/ActiveFilters'
 import { ConfirmDialog } from '@/shared/components/base/ConfirmDialog'
 import { FormDialog } from '@/shared/components/base/FormDialog'
 import { {{Feature}}CreateForm } from './components/{{Feature}}CreateForm'
@@ -613,6 +615,7 @@ export default function {{Feature}}ListingPage() {
     searchInput,
     setSearchInput,
     submitSearch,
+    setExtraParams,
     setPage,
     reload,
     isConfirmDialogOpen,
@@ -624,6 +627,35 @@ export default function {{Feature}}ListingPage() {
 
   const { isFormOpened, isSubmitting, openForm, closeForm, handleSubmit } =
     use{{Feature}}Create(reload)
+
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
+  const [appliedFilters, setAppliedFilters] = useState<Record<string, string[]>>({})
+
+  const filterGroups: FilterGroup[] = useMemo(() => [], [])
+
+  const activeFilterCount = Object.values(appliedFilters).flat().length
+
+  function handleApplyFilters(draft: Record<string, string[]>) {
+    setAppliedFilters(draft)
+    setFilterSheetOpen(false)
+    const extra: Record<string, string[]> = {}
+    for (const [key, vals] of Object.entries(draft)) {
+      if (vals.length > 0) extra[key] = vals
+    }
+    setExtraParams(Object.keys(extra).length > 0 ? extra : undefined)
+  }
+
+  function handleRemoveFilter(groupKey: string, value: string) {
+    const updated = {
+      ...appliedFilters,
+      [groupKey]: (appliedFilters[groupKey] ?? []).filter((v) => v !== value),
+    }
+    handleApplyFilters(updated)
+  }
+
+  function handleClearAllFilters() {
+    handleApplyFilters({})
+  }
 
   const renderCell = useCallback(
     (columnId: string, row: {{Feature}}Row) => {
@@ -657,6 +689,16 @@ export default function {{Feature}}ListingPage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between pb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">{t('{{feature}}Listing.page.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('{{feature}}Listing.page.description')}</p>
+        </div>
+        <Button disabled={isLoading} onClick={openForm}>
+          <PlusCircle className="w-4 h-4 mr-2" />
+          {t('common.newRegister')}
+        </Button>
+      </div>
       <ListingTable
         columns={columns}
         data={data}
@@ -669,11 +711,24 @@ export default function {{Feature}}ListingPage() {
         onSearchSubmit={submitSearch}
         onPageChange={setPage}
         renderCell={renderCell}
-        toolbarActions={
-          <Button disabled={isLoading} onClick={openForm}>
-            <PlusCircle className="w-4 h-4 mr-2" />
-            {t('common.newRegister')}
+        filters={
+          <Button variant="outline" disabled={isLoading} onClick={() => setFilterSheetOpen(true)}>
+            <Filter className="w-4 h-4 mr-2" />
+            {t('common.filters')}
+            {activeFilterCount > 0 && (
+              <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-medium text-primary-foreground">
+                {activeFilterCount}
+              </span>
+            )}
           </Button>
+        }
+        activeFilters={
+          <ActiveFilters
+            groups={filterGroups}
+            values={appliedFilters}
+            onRemove={handleRemoveFilter}
+            onClearAll={handleClearAllFilters}
+          />
         }
       />
 
@@ -703,6 +758,15 @@ export default function {{Feature}}ListingPage() {
           onSubmit={handleSubmit}
         />
       </FormDialog>
+
+      <FilterSheet
+        open={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        groups={filterGroups}
+        values={appliedFilters}
+        onApply={handleApplyFilters}
+        disabled={isLoading}
+      />
     </div>
   )
 }
@@ -803,6 +867,10 @@ function tplI18nListing({ Feature, feature, kebab }) {
     {
       'pt-BR': {
         [`${feature}Listing`]: {
+          page: {
+            title: `${Feature}`,
+            description: `Gerencie os registros de ${Feature}`,
+          },
           table: {
             columns: {
               name: 'Nome',
@@ -831,6 +899,10 @@ function tplI18nListing({ Feature, feature, kebab }) {
       },
       'en-US': {
         [`${feature}Listing`]: {
+          page: {
+            title: `${Feature}`,
+            description: `Manage the ${Feature} records`,
+          },
           table: {
             columns: {
               name: 'Name',
@@ -859,6 +931,10 @@ function tplI18nListing({ Feature, feature, kebab }) {
       },
       'es-ES': {
         [`${feature}Listing`]: {
+          page: {
+            title: `${Feature}`,
+            description: `Gestione los registros de ${Feature}`,
+          },
           table: {
             columns: {
               name: 'Nombre',

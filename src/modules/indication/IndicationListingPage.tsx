@@ -128,6 +128,21 @@ export default function IndicationListingPage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between pb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">
+            {t('indicationListing.page.title')}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {t('indicationListing.page.description')}
+          </p>
+        </div>
+        <Button disabled={isLoading} onClick={openForm}>
+          <PlusCircle className="w-4 h-4 mr-2" />
+          {t('common.newRegister')}
+        </Button>
+      </div>
+
       <ListingTable
         columns={columns}
         data={data}
@@ -159,12 +174,6 @@ export default function IndicationListingPage() {
             onRemove={handleRemoveFilter}
             onClearAll={handleClearAllFilters}
           />
-        }
-        toolbarActions={
-          <Button disabled={isLoading} onClick={openForm}>
-            <PlusCircle className="w-4 h-4 mr-2" />
-            {t('common.newRegister')}
-          </Button>
         }
       />
 

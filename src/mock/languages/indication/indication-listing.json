@@ -1,6 +1,10 @@
 {
   "pt-BR": {
     "indicationListing": {
+      "page": {
+        "title": "Indicações Geográficas",
+        "description": "Gerencie as indicações geográficas cadastradas no sistema"
+      },
       "table": {
         "columns": {
           "name": "Nome",
@@ -55,6 +59,10 @@
   },
   "en-US": {
     "indicationListing": {
+      "page": {
+        "title": "Geographical Indications",
+        "description": "Manage the geographical indications registered in the system"
+      },
       "table": {
         "columns": {
           "name": "Name",
@@ -104,6 +112,10 @@
   },
   "es-ES": {
     "indicationListing": {
+      "page": {
+        "title": "Indicaciones Geográficas",
+        "description": "Gestione las indicaciones geográficas registradas en el sistema"
+      },
       "table": {
         "columns": {
           "name": "Nombre",
